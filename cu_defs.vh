@@ -17,7 +17,7 @@
 `define NUM_WARPS   4
 
 // Number of vector registers per warp
-`define NUM_VREGS   8
+`define NUM_VREGS   32
 
 // Lane data width
 `define LANE_WIDTH  32
@@ -50,6 +50,8 @@
 `define INST_WIDTH  32
 `define OPCODE_W    6
 `define IMM_W       16
+`define IMEM_DEPTH   256  
+`define FUNC_W       6
 
 
 // ------------------------------------------------------------
@@ -62,37 +64,69 @@
 
 
 // ------------------------------------------------------------
-// 5. INSTRUCTION CLASS ENCODINGS
+// 5. INTERNAL INSTRUCTION CLASS (Decode Output)
 // ------------------------------------------------------------
 
 `define INST_ALU    2'b00
 `define INST_LSU    2'b01
 `define INST_BR     2'b10
-`define INST_EXIT   2'b11
+`define INST_SPECIAL 2'b11
 
 
 // ------------------------------------------------------------
-// 6. ALU OPERATION ENCODINGS
+// 6. OPCODE CLASS FIELD (opcode[5:3])
 // ------------------------------------------------------------
 
-`define ALU_ADD     4'b0000
-`define ALU_SUB     4'b0001
-`define ALU_AND     4'b0010
-`define ALU_OR      4'b0011
-`define ALU_XOR     4'b0100
-`define ALU_SLT     4'b0101
+`define OPC_CLASS_ALU      3'b000
+`define OPC_CLASS_MEM      3'b001
+`define OPC_CLASS_BRANCH   3'b010
+`define OPC_CLASS_SPECIAL  3'b011
+
+// ------------------------------------------------------------
+// 7. ALU OPCODES
+// ------------------------------------------------------------
+
+`define OPCODE_ALU_R   6'b000000
+`define OPCODE_ALU_I   6'b000001
+
+// ------------------------------------------------------------
+// 8. MEMORY OPCODES
+// ------------------------------------------------------------
+
+`define OPCODE_LOAD    6'b001000
+`define OPCODE_STORE   6'b001001
 
 
 // ------------------------------------------------------------
-// 7. MEMORY OPERATION TYPES
+// 9. BRANCH OPCODES
 // ------------------------------------------------------------
 
-`define MEM_LOAD    1'b0
-`define MEM_STORE   1'b1
+`define OPCODE_BEQ     6'b010000
+`define OPCODE_BNE     6'b010001
 
 
 // ------------------------------------------------------------
-// 8. COMMON MASK CONSTANTS
+// 10. SPECIAL OPCODES
+// ------------------------------------------------------------
+
+`define OPCODE_EXIT    6'b011000
+
+
+// ------------------------------------------------------------
+// 11. ALU FUNCTION CODES (R-Type)
+// ------------------------------------------------------------
+
+`define FUNC_ADD       6'b000000
+`define FUNC_SUB       6'b000001
+`define FUNC_AND       6'b000010
+`define FUNC_OR        6'b000011
+`define FUNC_XOR       6'b000100
+`define FUNC_SLT       6'b000101
+
+
+
+// ------------------------------------------------------------
+// 12. COMMON MASK CONSTANTS
 // ------------------------------------------------------------
 
 `define FULL_MASK   {`MASK_W{1'b1}}
