@@ -17,6 +17,7 @@ module decode_unit (
     input  wire [`INST_WIDTH-1:0]       instr_i,
     input  wire [`WARP_ID_W-1:0]        if_wid_i,
     input  wire                         if_valid_i,
+    input  wire [`MASK_W-1:0]           if_active_mask_i,
 
     // ===============================
     // ID/EX Pipeline Outputs
@@ -24,6 +25,7 @@ module decode_unit (
 
     output reg  [`WARP_ID_W-1:0]        wid_o,
     output reg                          valid_o,
+    output reg  [`MASK_W-1:0]           active_mask_o,
 
     // Register fields
     output reg  [`REG_ID_W-1:0]         rs_o,
@@ -38,6 +40,7 @@ module decode_unit (
     output reg  [`FUNC_W-1:0]           alu_func_o,
 
     // Control signals
+    output reg                          alu_src_imm_o,
     output reg                          reg_write_o,
     output reg                          mem_read_o,
     output reg                          mem_write_o,
@@ -79,6 +82,7 @@ module decode_unit (
             end
 
             `OPCODE_ALU_I: begin
+                alu_src_imm_o = 1;
                 reg_write_d = 1;
                 alu_func_d  = `FUNC_ADD;
             end
@@ -114,6 +118,7 @@ module decode_unit (
         if (rst) begin
             wid_o         <= 0;
             valid_o       <= 0;
+            active_mask_o <= 0;
 
             rs_o          <= 0;
             rt_o          <= 0;
@@ -143,6 +148,7 @@ module decode_unit (
             instr_class_o <= instr_class_d;
             alu_func_o    <= alu_func_d;
 
+            active_mask_o <= if_active_mask_i;
             reg_write_o   <= reg_write_d;
             mem_read_o    <= mem_read_d;
             mem_write_o   <= mem_write_d;

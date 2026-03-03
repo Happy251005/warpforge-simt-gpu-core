@@ -68,6 +68,10 @@ module warp_manager (
             active_mask_array[write_wid] <= write_active_mask;
             warp_state_array[write_wid] <= write_warp_state;
         end
+
+        else if(found) begin
+            pc_array[temp_id] <= pc_array[temp_id] + 4; // Increment PC by 4 for next instruction
+        end
     end
 
     always @(*) begin

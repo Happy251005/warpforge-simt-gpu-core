@@ -15,7 +15,9 @@ module vector_ALU (
     input  wire [`WARP_SIZE*`LANE_WIDTH-1:0] rt_flat_i,
     input  wire [`IMM_W-1:0]                 imm_i,
 
+    input  wire [`MASK_W-1:0]                active_mask_i,
     input  wire [`FUNC_W-1:0]                alu_func_i,
+    input  wire                              alu_src_imm_i,
     input  wire                              branch_i,
     input  wire [2:0]                        instr_class_i,
 
@@ -41,24 +43,28 @@ module vector_ALU (
             assign rt_lane = rt_flat_i[(lane+1)*`LANE_WIDTH-1 -: `LANE_WIDTH];
 
             always @(*) begin
-                case (alu_func_i)
+                if(!active_mask_i[lane]) begin
+                    result_lane = 0; // Inactive lanes produce 0 result (v1)
+                end
+                else begin
+                    case (alu_func_i)
 
-                    `FUNC_ADD: result_lane = rs_lane + 
-                                            ((instr_class_i == `OPC_CLASS_ALU) ? rt_lane : imm_ext);
+                        `FUNC_ADD: result_lane = rs_lane + (alu_src_imm_i ? imm_ext : rt_lane);
 
-                    `FUNC_SUB: result_lane = rs_lane - rt_lane;
+                        `FUNC_SUB: result_lane = rs_lane - rt_lane;
 
-                    `FUNC_AND: result_lane = rs_lane & rt_lane;
+                        `FUNC_AND: result_lane = rs_lane & rt_lane;
 
-                    `FUNC_OR:  result_lane = rs_lane | rt_lane;
+                        `FUNC_OR:  result_lane = rs_lane | rt_lane;
 
-                    `FUNC_XOR: result_lane = rs_lane ^ rt_lane;
+                        `FUNC_XOR: result_lane = rs_lane ^ rt_lane;
 
-                    `FUNC_SLT: result_lane = ($signed(rs_lane) < $signed(rt_lane)) ? 1 : 0;
+                        `FUNC_SLT: result_lane = ($signed(rs_lane) < $signed(rt_lane)) ? 1 : 0;
 
-                    default:   result_lane = 0;
+                        default:   result_lane = 0;
 
-                endcase
+                    endcase
+                end
             end
 
             assign result_flat_o[(lane+1)*`LANE_WIDTH-1 -: `LANE_WIDTH] = result_lane;

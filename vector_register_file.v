@@ -18,6 +18,7 @@ module vector_register_file (
 
     // Warp selection
     input  wire [`WARP_ID_W-1:0]        wid_i,
+    input  wire [`MASK_W-1:0]           write_mask_i,
 
     // Read ports
     input  wire [`REG_ID_W-1:0]         rs_i,
@@ -51,8 +52,8 @@ module vector_register_file (
         end
         else if (reg_write_i) begin
             for (l = 0; l < `WARP_SIZE; l = l + 1)
-                regfile[wid_i][l][rd_i] 
-                    <= write_data_i[(l+1)*`LANE_WIDTH-1 -: `LANE_WIDTH];
+                if (write_mask_i[l])
+                    regfile[wid_i][l][rd_i] <= write_data_i[(l+1)*`LANE_WIDTH-1 -: `LANE_WIDTH];
         end
     end
 
