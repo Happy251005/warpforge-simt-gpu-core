@@ -58,21 +58,24 @@ module decode_unit (
 
     wire [2:0] instr_class_d = opcode[5:3];
 
+
     reg reg_write_d;
     reg mem_read_d;
     reg mem_write_d;
     reg branch_d;
     reg [`FUNC_W-1:0] alu_func_d;
+    reg alu_src_imm_d;
     reg exit_d;
 
     always @(*) begin
         // Default safe values
-        reg_write_d = 0;
-        mem_read_d  = 0;
-        mem_write_d = 0;
-        branch_d    = 0;
-        alu_func_d  = 0;
-        exit_d      = 0;
+        reg_write_d   = 0;
+        mem_read_d    = 0;
+        mem_write_d   = 0;
+        branch_d      = 0;
+        alu_func_d    = 0;
+        exit_d        = 0;
+        alu_src_imm_d = 0;
 
         case (opcode)
 
@@ -82,7 +85,7 @@ module decode_unit (
             end
 
             `OPCODE_ALU_I: begin
-                alu_src_imm_o = 1;
+                alu_src_imm_d = 1;
                 reg_write_d = 1;
                 alu_func_d  = `FUNC_ADD;
             end
@@ -128,6 +131,7 @@ module decode_unit (
             instr_class_o <= 0;
             alu_func_o    <= 0;
 
+            alu_src_imm_o <= 0;
             reg_write_o   <= 0;
             mem_read_o    <= 0;
             mem_write_o   <= 0;
@@ -148,6 +152,7 @@ module decode_unit (
             instr_class_o <= instr_class_d;
             alu_func_o    <= alu_func_d;
 
+            alu_src_imm_o <= alu_src_imm_d;
             active_mask_o <= if_active_mask_i;
             reg_write_o   <= reg_write_d;
             mem_read_o    <= mem_read_d;
