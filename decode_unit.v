@@ -66,6 +66,7 @@ module decode_unit (
     reg [`FUNC_W-1:0] alu_func_d;
     reg alu_src_imm_d;
     reg exit_d;
+    reg rd_use_rt_d;  // For I-type: dest is rt, not rd
 
     always @(*) begin
         // Default safe values
@@ -76,6 +77,7 @@ module decode_unit (
         alu_func_d    = 0;
         exit_d        = 0;
         alu_src_imm_d = 0;
+        rd_use_rt_d   = 0;
 
         case (opcode)
 
@@ -88,11 +90,13 @@ module decode_unit (
                 alu_src_imm_d = 1;
                 reg_write_d = 1;
                 alu_func_d  = `FUNC_ADD;
+                rd_use_rt_d = 1;
             end
 
             `OPCODE_LOAD: begin
                 reg_write_d = 1;
                 mem_read_d  = 1;
+                rd_use_rt_d = 1;
             end
 
             `OPCODE_STORE: begin
@@ -146,7 +150,7 @@ module decode_unit (
             // Decoded fields
             rs_o          <= rs_d;
             rt_o          <= rt_d;
-            rd_o          <= rd_d;
+            rd_o          <= rd_use_rt_d ? rt_d : rd_d;
             imm_o         <= imm_d;
 
             instr_class_o <= instr_class_d;

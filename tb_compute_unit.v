@@ -97,7 +97,7 @@ module tb_compute_unit;
         #20 rst = 0;
 
         // Run simulation
-        #500;
+        #3000;
 
         $display("Simulation finished.");
         $finish;
@@ -110,7 +110,7 @@ module tb_compute_unit;
         imem_rdata,
         dmem_write_en,
         dmem_addr);
-    $display("ALU=%h", dut.ex_mem_alu_result);
+    $display("  ALU=%h | StoreData=%h", dut.ex_mem_alu_result, dut.ex_mem_store_data);
     end
 
 endmodule

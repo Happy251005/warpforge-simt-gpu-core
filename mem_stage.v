@@ -59,6 +59,7 @@ module mem_stage (
     assign dmem_write_data_o = store_data_i;
     assign dmem_write_mask_o = active_mask_i;
     assign dmem_write_en_o   = mem_write_i & valid_i;
+    assign dmem_read_en_o    = mem_read_i & valid_i;
 
 
     // MEM/WB Pipeline Register

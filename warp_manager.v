@@ -91,25 +91,22 @@ module warp_manager (
 
     end
 
-    always @(posedge clk) begin
+    // current_wid and issue_valid are combinational — available immediately
+    always @(*) begin
+        current_wid = temp_id;
+        issue_valid = found;
+    end
 
+    // Round-robin pointer update (registered)
+    always @(posedge clk) begin
         if(rst) begin
             rr_ptr <= 0;
-            issue_valid <= 0;
-            current_wid <= 0;
         end
-
         else if(found) begin
-            current_wid <= temp_id;
-            issue_valid <= 1;
             if (temp_id == `NUM_WARPS-1)
                 rr_ptr <= 0;
             else
                 rr_ptr <= temp_id + 1;
-        end
-
-        else begin
-            issue_valid <= 0; // No READY warp found
         end
     end
 endmodule

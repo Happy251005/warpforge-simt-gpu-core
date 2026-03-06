@@ -30,23 +30,20 @@ module instruction_fetch (
     reg [`MASK_W-1:0] active_mask_d;
     assign imem_addr = current_pc;
 
-    // Fetch logic
+    // Fetch logic — single pipeline stage
+    // Capture instruction and metadata together so they stay aligned
     always @(posedge clk) begin
         if(rst) begin
-            wid_d <= 0;
-            valid_d <= 0;
             if_instruction <= 0;
             if_wid <= 0;
+            if_valid <= 0;
             if_active_mask <= 0;
         end
         else begin
-            wid_d <= current_wid;
-            valid_d <= issue_valid;
-            active_mask_d <= current_active_mask;
             if_instruction <= imem_rdata;
-            if_wid <= wid_d;
-            if_valid <= valid_d;
-            if_active_mask <= active_mask_d;
+            if_wid <= current_wid;
+            if_valid <= issue_valid;
+            if_active_mask <= current_active_mask;
         end
     end
 endmodule
