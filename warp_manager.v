@@ -25,8 +25,8 @@ module warp_manager (
     // Scheduling Output
     // ============================
 
-    output reg  [`WARP_ID_W-1:0]        current_wid,
-    output reg                          issue_valid,
+    output wire [`WARP_ID_W-1:0]        current_wid,
+    output wire                         issue_valid,
 
     // ============================
     // Read Access for Selected Warp
@@ -91,25 +91,21 @@ module warp_manager (
 
     end
 
+    assign current_wid = temp_id;
+    assign issue_valid = found;
+
     always @(posedge clk) begin
 
         if(rst) begin
             rr_ptr <= 0;
-            issue_valid <= 0;
-            current_wid <= 0;
         end
 
         else if(found) begin
-            current_wid <= temp_id;
-            issue_valid <= 1;
             if (temp_id == `NUM_WARPS-1)
                 rr_ptr <= 0;
             else
                 rr_ptr <= temp_id + 1;
         end
 
-        else begin
-            issue_valid <= 0; // No READY warp found
-        end
     end
 endmodule
