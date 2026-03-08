@@ -132,4 +132,8 @@
 `define FULL_MASK   {`MASK_W{1'b1}}
 `define ZERO_MASK   {`MASK_W{1'b0}}
 
+
+`define REG_ZERO    5'd0   // hardwired zero, writes ignored
+`define REG_TID     5'd1   // thread ID, set at reset, read-only by convention
+
 `endif // CU_DEFS_VH

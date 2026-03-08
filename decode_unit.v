@@ -18,6 +18,7 @@ module decode_unit (
     input  wire [`WARP_ID_W-1:0]        if_wid_i,
     input  wire                         if_valid_i,
     input  wire [`MASK_W-1:0]           if_active_mask_i,
+    input  wire [`PC_WIDTH-1:0]         if_pc_i,
 
     // ===============================
     // ID/EX Pipeline Outputs
@@ -26,6 +27,7 @@ module decode_unit (
     output reg  [`WARP_ID_W-1:0]        wid_o,
     output reg                          valid_o,
     output reg  [`MASK_W-1:0]           active_mask_o,
+    output reg  [`PC_WIDTH-1:0]         pc_o,
 
     // Register fields
     output reg  [`REG_ID_W-1:0]         rs_o,
@@ -126,6 +128,7 @@ module decode_unit (
             wid_o         <= 0;
             valid_o       <= 0;
             active_mask_o <= 0;
+            pc_o          <= 0;
 
             rs_o          <= 0;
             rt_o          <= 0;
@@ -146,7 +149,9 @@ module decode_unit (
             // SIMT identity propagation
             wid_o         <= if_wid_i;
             valid_o       <= if_valid_i;
-
+            active_mask_o <= if_active_mask_i;
+            pc_o          <= if_pc_i;
+            
             // Decoded fields
             rs_o          <= rs_d;
             rt_o          <= rt_d;

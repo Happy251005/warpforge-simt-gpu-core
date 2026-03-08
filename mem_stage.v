@@ -18,6 +18,7 @@ module mem_stage (
     input  wire [`WARP_ID_W-1:0]        wid_i,
     input  wire                         valid_i,
     input  wire [`MASK_W-1:0]           active_mask_i,
+    input  wire [`PC_WIDTH-1:0]         pc_i,
 
     input  wire [`WARP_SIZE*`LANE_WIDTH-1:0] alu_result_i,
     input  wire [`WARP_SIZE*`LANE_WIDTH-1:0] mem_addr_i,
@@ -44,6 +45,7 @@ module mem_stage (
     output reg  [`WARP_ID_W-1:0]        wid_o,
     output reg                          valid_o,
     output reg  [`MASK_W-1:0]           active_mask_o,
+    output reg  [`PC_WIDTH-1:0]         pc_o,
 
     output reg  [`WARP_SIZE*`LANE_WIDTH-1:0] result_o,
     output reg  [`REG_ID_W-1:0]         rd_o,
@@ -68,6 +70,8 @@ module mem_stage (
             wid_o           <= 0;
             valid_o         <= 0;
             active_mask_o   <= 0;
+            pc_o            <= 0;
+            
             result_o        <= 0;
             rd_o            <= 0;
             reg_write_o     <= 0;
@@ -78,6 +82,8 @@ module mem_stage (
             wid_o         <= wid_i;
             valid_o       <= valid_i;
             active_mask_o <= active_mask_i;
+            pc_o          <= pc_i;
+            
             rd_o          <= rd_i;
 
             branch_taken_o <= branch_taken_i;

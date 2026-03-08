@@ -47,11 +47,14 @@ module vector_register_file (
     always @(posedge clk) begin
         if (rst) begin
             for (w = 0; w < `NUM_WARPS; w = w + 1)
-                for (l = 0; l < `WARP_SIZE; l = l + 1)
+                for (l = 0; l < `WARP_SIZE; l = l + 1) begin
                     for (r = 0; r < `NUM_VREGS; r = r + 1)
                         regfile[w][l][r] <= 0;
+
+                    regfile[w][l][`REG_TID] <= w * `WARP_SIZE + l;
+                end
         end
-        else if (reg_write_i) begin
+        else if (reg_write_i && (rd_i != `REG_ZERO)) begin
             for (l = 0; l < `WARP_SIZE; l = l + 1)
                 if (write_mask_i[l])
                     regfile[write_wid_i][l][rd_i] <= write_data_i[(l+1)*`LANE_WIDTH-1 -: `LANE_WIDTH];

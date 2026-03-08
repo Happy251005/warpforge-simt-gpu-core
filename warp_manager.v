@@ -70,7 +70,7 @@ module warp_manager (
         end
 
         else if(found) begin
-            pc_array[temp_id] <= pc_array[temp_id] + 4; // Increment PC by 4 for next instruction
+            warp_state_array[temp_id] <= `WARP_STALL;
         end
     end
 
@@ -78,7 +78,7 @@ module warp_manager (
         found = 0;
         temp_id = rr_ptr;
 
-        for (i = 0; i < `NUM_WARPS; i++) begin
+        for (i = 0; i < `NUM_WARPS; i=i+1) begin
             idx = rr_ptr + i;
             if (idx >= `NUM_WARPS)
                 idx = idx - `NUM_WARPS;

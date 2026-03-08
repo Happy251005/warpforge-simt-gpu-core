@@ -10,7 +10,7 @@ module instruction_fetch (
     input  wire rst,
 
     // From Warp Manager
-    input  wire                     issue_valid,
+    input  wire                      issue_valid,
     input  wire [`WARP_ID_W-1:0]     current_wid,
     input  wire [`PC_WIDTH-1:0]      current_pc,
     input  wire [`MASK_W-1:0]        current_active_mask,
@@ -23,7 +23,8 @@ module instruction_fetch (
     output reg  [`INST_WIDTH-1:0]    if_instruction,
     output reg  [`WARP_ID_W-1:0]     if_wid,
     output reg                       if_valid,
-    output reg  [`MASK_W-1:0]        if_active_mask
+    output reg  [`MASK_W-1:0]        if_active_mask,
+    output reg  [`PC_WIDTH-1:0]      if_pc
 );
 
     assign imem_addr = current_pc;
@@ -35,12 +36,14 @@ module instruction_fetch (
             if_wid <= 0;
             if_valid <= 0;
             if_active_mask <= 0;
+            if_pc <= 0;
         end
         else begin
             if_instruction <= imem_rdata;
             if_wid <= current_wid;
             if_valid <= issue_valid;
             if_active_mask <= current_active_mask;
+            if_pc <= current_pc;
         end
     end
 endmodule

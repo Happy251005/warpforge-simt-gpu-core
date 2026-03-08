@@ -18,6 +18,7 @@ module writeback_stage (
     input  wire [`WARP_ID_W-1:0]        wid_i,
     input  wire                         valid_i,
     input  wire [`MASK_W-1:0]           active_mask_i,
+    input  wire [`PC_WIDTH-1:0]         pc_i,
 
     input  wire [`WARP_SIZE*`LANE_WIDTH-1:0] result_i,
     input  wire [`REG_ID_W-1:0]         rd_i,
@@ -39,7 +40,9 @@ module writeback_stage (
 
     output reg                          warp_update_en_o,
     output reg  [`WARP_ID_W-1:0]        warp_update_wid_o,
-    output reg  [`WARP_STATE_W-1:0]     warp_update_state_o
+    output reg  [`WARP_STATE_W-1:0]     warp_update_state_o,
+    output reg  [`PC_WIDTH-1:0]         warp_update_pc_o,
+    output reg  [`MASK_W-1:0]           warp_update_mask_o
 
 );
 
@@ -58,13 +61,24 @@ module writeback_stage (
         if (rst) begin
             warp_update_en_o    <= 0;
             warp_update_wid_o   <= 0;
-            warp_update_state_o <= 0;
+            warp_update_state_o <= `WARP_READY;
+            warp_update_pc_o    <= 0;
+            warp_update_mask_o  <= 0;
         end
         else begin
-            if (valid_i && exit_i) begin
+            if (valid_i) begin
                 warp_update_en_o    <= 1;
                 warp_update_wid_o   <= wid_i;
-                warp_update_state_o <= `WARP_DONE;
+                warp_update_mask_o  <= active_mask_i;
+
+                if(exit_i) begin
+                    warp_update_state_o <= `WARP_DONE;
+                    warp_update_pc_o    <= pc_i; // Not used for DONE warps
+                end
+                else begin
+                    warp_update_state_o <= `WARP_READY;
+                    warp_update_pc_o    <= pc_i + 4; // No PC update on non-EXIT instructions in v1
+                end
             end
             else begin
                 warp_update_en_o <= 0;

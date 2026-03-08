@@ -52,11 +52,13 @@ module compute_unit (
     wire [`WARP_ID_W-1:0]    if_id_wid;
     wire                     if_id_valid;
     wire [`MASK_W-1:0]       if_id_mask;
+    wire [`PC_WIDTH-1:0]     if_id_pc;
 
     // ID/EX
     wire [`WARP_ID_W-1:0]    id_ex_wid;
     wire                     id_ex_valid;
     wire [`MASK_W-1:0]       id_ex_mask;
+    wire [`PC_WIDTH-1:0]     id_ex_pc;
 
     wire [`REG_ID_W-1:0]     id_ex_rs;
     wire [`REG_ID_W-1:0]     id_ex_rt;
@@ -79,6 +81,7 @@ module compute_unit (
     wire [`WARP_ID_W-1:0]    ex_mem_wid;
     wire                     ex_mem_valid;
     wire [`MASK_W-1:0]       ex_mem_mask;
+    wire [`PC_WIDTH-1:0]     ex_mem_pc;
 
     wire [`WARP_SIZE*`LANE_WIDTH-1:0] ex_mem_alu_result;
     wire [`WARP_SIZE*`LANE_WIDTH-1:0] ex_mem_store_data;
@@ -94,6 +97,7 @@ module compute_unit (
     wire [`WARP_ID_W-1:0]    mem_wb_wid;
     wire                     mem_wb_valid;
     wire [`MASK_W-1:0]       mem_wb_mask;
+    wire [`PC_WIDTH-1:0]     mem_wb_pc;
 
     wire [`WARP_SIZE*`LANE_WIDTH-1:0] mem_wb_result;
     wire [`REG_ID_W-1:0]     mem_wb_rd;
@@ -111,6 +115,8 @@ module compute_unit (
     wire                     warp_update_en;
     wire [`WARP_ID_W-1:0]    warp_update_wid;
     wire [`WARP_STATE_W-1:0] warp_update_state;
+    wire [`PC_WIDTH-1:0]     warp_update_pc;
+    wire [`MASK_W-1:0]       warp_update_mask;
         
     // Warp Manager
     warp_manager u_warp_manager (
@@ -119,8 +125,8 @@ module compute_unit (
 
     .write_en(warp_update_en),
     .write_wid(warp_update_wid),
-    .write_pc(16'd0), // v1: no redirect, ignore
-    .write_active_mask(`FULL_MASK),
+    .write_pc(warp_update_pc), 
+    .write_active_mask(warp_update_mask),
     .write_warp_state(warp_update_state),
 
     .current_wid(wm_wid),
@@ -147,7 +153,8 @@ module compute_unit (
     .if_instruction(if_id_inst),
     .if_wid(if_id_wid),
     .if_valid(if_id_valid),
-    .if_active_mask(if_id_mask)
+    .if_active_mask(if_id_mask),
+    .if_pc(if_id_pc)
     );
 
     // Decode Unit
@@ -159,10 +166,12 @@ module compute_unit (
     .if_wid_i(if_id_wid),
     .if_valid_i(if_id_valid),
     .if_active_mask_i(if_id_mask),
+    .if_pc_i(if_id_pc),
 
     .wid_o(id_ex_wid),
     .valid_o(id_ex_valid),
     .active_mask_o(id_ex_mask),
+    .pc_o(id_ex_pc),
 
     .rs_o(id_ex_rs),
     .rt_o(id_ex_rt),
@@ -207,6 +216,7 @@ module compute_unit (
     .wid_i(id_ex_wid),
     .valid_i(id_ex_valid),
     .active_mask_i(id_ex_mask),
+    .pc_i(id_ex_pc),
 
     .rs_flat_i(vrf_rs_flat),
     .rt_flat_i(vrf_rt_flat),
@@ -227,6 +237,7 @@ module compute_unit (
     .wid_o(ex_mem_wid),
     .valid_o(ex_mem_valid),
     .active_mask_o(ex_mem_mask),
+    .pc_o(ex_mem_pc),
 
     .alu_result_o(ex_mem_alu_result),
     .mem_addr_o(ex_mem_mem_addr),
@@ -250,6 +261,7 @@ module compute_unit (
     .wid_i(ex_mem_wid),
     .valid_i(ex_mem_valid),
     .active_mask_i(ex_mem_mask),
+    .pc_i(ex_mem_pc),
 
     .alu_result_i(ex_mem_alu_result),
     .mem_addr_i(ex_mem_mem_addr),
@@ -276,6 +288,7 @@ module compute_unit (
     .wid_o(mem_wb_wid),
     .valid_o(mem_wb_valid),
     .active_mask_o(mem_wb_mask),
+    .pc_o(mem_wb_pc),        
 
     .result_o(mem_wb_result),
     .rd_o(mem_wb_rd),
@@ -293,6 +306,7 @@ module compute_unit (
     .wid_i(mem_wb_wid),
     .valid_i(mem_wb_valid),
     .active_mask_i(mem_wb_mask),
+    .pc_i(mem_wb_pc),
 
     .result_i(mem_wb_result),
     .rd_i(mem_wb_rd),
@@ -307,7 +321,9 @@ module compute_unit (
 
     .warp_update_en_o(warp_update_en),
     .warp_update_wid_o(warp_update_wid),
-    .warp_update_state_o(warp_update_state)
+    .warp_update_state_o(warp_update_state),
+    .warp_update_pc_o(warp_update_pc),
+    .warp_update_mask_o(warp_update_mask)
     );
 
 endmodule
