@@ -57,33 +57,35 @@ module writeback_stage (
 
     // EXIT Handling
 
+    // -------------------------------------------------------
+    // Warp commit - registered
+    // Captures the instruction's warp ID, next PC, and target
+    // state on the clock edge when it is at WB. The warp manager
+    // sees write_en one cycle later - after its own combinational
+    // scheduler has already processed the current cycle cleanly.
+    // -------------------------------------------------------
     always @(posedge clk) begin
         if (rst) begin
             warp_update_en_o    <= 0;
             warp_update_wid_o   <= 0;
             warp_update_state_o <= `WARP_READY;
             warp_update_pc_o    <= 0;
-            warp_update_mask_o  <= 0;
+            warp_update_mask_o  <= `FULL_MASK;
         end
         else begin
             if (valid_i) begin
                 warp_update_en_o    <= 1;
                 warp_update_wid_o   <= wid_i;
                 warp_update_mask_o  <= active_mask_i;
-
-                if(exit_i) begin
-                    warp_update_state_o <= `WARP_DONE;
-                    warp_update_pc_o    <= pc_i; // Not used for DONE warps
-                end
-                else begin
-                    warp_update_state_o <= `WARP_READY;
-                    warp_update_pc_o    <= pc_i + 4; // No PC update on non-EXIT instructions in v1
-                end
+                warp_update_pc_o    <= pc_i + 4;
+                warp_update_state_o <= exit_i ? `WARP_DONE : `WARP_READY;
             end
             else begin
                 warp_update_en_o <= 0;
             end
         end
     end
+
+
 
 endmodule

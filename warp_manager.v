@@ -45,11 +45,29 @@ module warp_manager (
     reg [`WARP_ID_W-1:0] temp_id; // Temporary variable to hold warp ID during scheduling
     reg [`WARP_ID_W-1:0] idx; // Index variable for loop iteration
 
+    // One-cycle delayed copies of the commit signals
+    reg                  write_en_q;
+    reg [`WARP_ID_W-1:0] write_wid_q;
+
     integer i;
 
     // Read logic
     assign current_pc = pc_array[current_wid];
     assign current_active_mask = active_mask_array[current_wid];
+
+    // ============================
+    // Delayed commit signals
+    // ============================
+    always @(posedge clk) begin
+        if (rst) begin
+            write_en_q  <= 0;
+            write_wid_q <= 0;
+        end
+        else begin
+            write_en_q  <= write_en;
+            write_wid_q <= write_wid;
+        end
+    end
 
     // Write logic
     always @(posedge clk) begin
@@ -63,14 +81,16 @@ module warp_manager (
             end
         end 
         
-        else if(write_en) begin
-            pc_array[write_wid] <= write_pc;
-            active_mask_array[write_wid] <= write_active_mask;
-            warp_state_array[write_wid] <= write_warp_state;
-        end
-
-        else if(found) begin
-            warp_state_array[temp_id] <= `WARP_STALL;
+        else begin
+            if(write_en) begin
+                pc_array[write_wid] <= write_pc;
+                active_mask_array[write_wid] <= write_active_mask;
+                warp_state_array[write_wid] <= write_warp_state;
+            end
+    
+            if (found && !(write_en && write_wid == temp_id)) begin
+                warp_state_array[temp_id] <= `WARP_STALL;
+            end
         end
     end
 
@@ -83,7 +103,7 @@ module warp_manager (
             if (idx >= `NUM_WARPS)
                 idx = idx - `NUM_WARPS;
 
-            if (!found && warp_state_array[idx] == `WARP_READY) begin
+            if (!found && warp_state_array[idx] == `WARP_READY && !(write_en && (write_wid == idx)) && !(write_en_q && (write_wid_q == idx))) begin
                 temp_id = idx;
                 found = 1;
             end
