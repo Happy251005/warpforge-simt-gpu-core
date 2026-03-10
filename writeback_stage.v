@@ -24,6 +24,8 @@ module writeback_stage (
     input  wire [`REG_ID_W-1:0]         rd_i,
 
     input  wire                         reg_write_i,
+    input  wire                         branch_taken_i,
+    input  wire [`PC_WIDTH-1:0]         branch_target_i,
     input  wire                         exit_i,
 
 
@@ -55,15 +57,13 @@ module writeback_stage (
     assign vrf_write_mask_o = active_mask_i;
 
 
+    // Commit PC selection
+    // Branch taken → branch_target, everything else → pc + 4
+    wire [`PC_WIDTH-1:0] commit_pc;
+    assign commit_pc = branch_taken_i ? branch_target_i : pc_i + 4;
+
     // EXIT Handling
 
-    // -------------------------------------------------------
-    // Warp commit - registered
-    // Captures the instruction's warp ID, next PC, and target
-    // state on the clock edge when it is at WB. The warp manager
-    // sees write_en one cycle later - after its own combinational
-    // scheduler has already processed the current cycle cleanly.
-    // -------------------------------------------------------
     always @(posedge clk) begin
         if (rst) begin
             warp_update_en_o    <= 0;
@@ -77,7 +77,7 @@ module writeback_stage (
                 warp_update_en_o    <= 1;
                 warp_update_wid_o   <= wid_i;
                 warp_update_mask_o  <= active_mask_i;
-                warp_update_pc_o    <= pc_i + 4;
+                warp_update_pc_o    <= commit_pc;
                 warp_update_state_o <= exit_i ? `WARP_DONE : `WARP_READY;
             end
             else begin

@@ -47,6 +47,7 @@ module decode_unit (
     output reg                          mem_read_o,
     output reg                          mem_write_o,
     output reg                          branch_o,
+    output reg                          branch_inv_o,
     output reg                          exit_o
 );
 
@@ -65,6 +66,7 @@ module decode_unit (
     reg mem_read_d;
     reg mem_write_d;
     reg branch_d;
+    reg branch_inv_d;
     reg [`FUNC_W-1:0] alu_func_d;
     reg alu_src_imm_d;
     reg exit_d;
@@ -77,6 +79,7 @@ module decode_unit (
         mem_read_d    = 0;
         mem_write_d   = 0;
         branch_d      = 0;
+        branch_inv_d  = 0;
         alu_func_d    = 0;
         exit_d        = 0;
         alu_src_imm_d = 0;
@@ -105,9 +108,14 @@ module decode_unit (
                 mem_write_d = 1;
             end
 
-            `OPCODE_BEQ,
+            `OPCODE_BEQ: begin
+                branch_d     = 1;
+                branch_inv_d = 0;   // taken when rs == rt
+            end
+
             `OPCODE_BNE: begin
-                branch_d = 1;
+                branch_d     = 1;
+                branch_inv_d = 1;   // taken when rs != rt
             end
 
             `OPCODE_EXIT: begin
@@ -143,6 +151,7 @@ module decode_unit (
             mem_read_o    <= 0;
             mem_write_o   <= 0;
             branch_o      <= 0;
+            branch_inv_o  <= 0;
             exit_o        <= 0;
         end
         else begin
@@ -167,6 +176,7 @@ module decode_unit (
             mem_read_o    <= mem_read_d;
             mem_write_o   <= mem_write_d;
             branch_o      <= branch_d;
+            branch_inv_o  <= branch_inv_d;
             exit_o        <= exit_d;
         end
     end

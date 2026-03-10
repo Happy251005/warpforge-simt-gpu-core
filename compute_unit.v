@@ -71,6 +71,7 @@ module compute_unit (
     wire                     id_ex_mem_read;
     wire                     id_ex_mem_write;
     wire                     id_ex_branch;
+    wire                     id_ex_branch_inv;
     wire                     id_ex_exit;
 
     // VRF read
@@ -82,6 +83,8 @@ module compute_unit (
     wire                     ex_mem_valid;
     wire [`MASK_W-1:0]       ex_mem_mask;
     wire [`PC_WIDTH-1:0]     ex_mem_pc;
+    wire [`PC_WIDTH-1:0]     ex_mem_branch_target;
+    wire                     ex_mem_branch_taken;
 
     wire [`WARP_SIZE*`LANE_WIDTH-1:0] ex_mem_alu_result;
     wire [`WARP_SIZE*`LANE_WIDTH-1:0] ex_mem_store_data;
@@ -102,6 +105,8 @@ module compute_unit (
     wire [`WARP_SIZE*`LANE_WIDTH-1:0] mem_wb_result;
     wire [`REG_ID_W-1:0]     mem_wb_rd;
     wire                     mem_wb_reg_write;
+    wire                     mem_wb_branch_taken;
+    wire [`PC_WIDTH-1:0]     mem_wb_branch_target;
     wire                     mem_wb_exit;
 
     // WB → VRF
@@ -185,6 +190,7 @@ module compute_unit (
     .mem_read_o(id_ex_mem_read),
     .mem_write_o(id_ex_mem_write),
     .branch_o(id_ex_branch),
+    .branch_inv_o(id_ex_branch_inv),
     .exit_o(id_ex_exit)
     );
 
@@ -231,6 +237,7 @@ module compute_unit (
     .mem_read_i(id_ex_mem_read),
     .mem_write_i(id_ex_mem_write),
     .branch_i(id_ex_branch),
+    .branch_inv_i(id_ex_branch_inv),
     .exit_i(id_ex_exit),
 
     // To EX/MEM
@@ -248,7 +255,8 @@ module compute_unit (
     .reg_write_o(ex_mem_reg_write),
     .mem_read_o(ex_mem_mem_read),
     .mem_write_o(ex_mem_mem_write),
-    .branch_taken_o(),     // unused in v1
+    .branch_taken_o(ex_mem_branch_taken),
+    .branch_target_o(ex_mem_branch_target),
     .exit_o(ex_mem_exit)
     );
 
@@ -272,7 +280,8 @@ module compute_unit (
     .reg_write_i(ex_mem_reg_write),
     .mem_read_i(ex_mem_mem_read),
     .mem_write_i(ex_mem_mem_write),
-    .branch_taken_i(1'b0),          // v1: no branch redirect
+    .branch_taken_i(ex_mem_branch_taken),
+    .branch_target_i(ex_mem_branch_target),
     .exit_i(ex_mem_exit),
 
     // Data memory interface
@@ -294,7 +303,8 @@ module compute_unit (
     .rd_o(mem_wb_rd),
 
     .reg_write_o(mem_wb_reg_write),
-    .branch_taken_o(),              // unused in v1
+    .branch_taken_o(mem_wb_branch_taken),
+    .branch_target_o(mem_wb_branch_target),
     .exit_o(mem_wb_exit)
     );
 
@@ -311,6 +321,8 @@ module compute_unit (
     .result_i(mem_wb_result),
     .rd_i(mem_wb_rd),
     .reg_write_i(mem_wb_reg_write),
+    .branch_taken_i(mem_wb_branch_taken),
+    .branch_target_i(mem_wb_branch_target),
     .exit_i(mem_wb_exit),
 
     .vrf_reg_write_o(vrf_write_en),

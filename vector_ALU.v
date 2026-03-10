@@ -19,6 +19,7 @@ module vector_ALU (
     input  wire [`FUNC_W-1:0]                alu_func_i,
     input  wire                              alu_src_imm_i,
     input  wire                              branch_i,
+    input  wire                              branch_inv_i,
     input  wire [2:0]                        instr_class_i,
 
     output wire [`WARP_SIZE*`LANE_WIDTH-1:0] result_flat_o,
@@ -75,6 +76,6 @@ module vector_ALU (
     endgenerate
 
     // Warp-wide branch decision (v1: all lanes must agree)
-    assign branch_taken_o = branch_i ? &branch_lane_eq : 1'b0;
+    assign branch_taken_o = branch_i ? (&branch_lane_eq ^ branch_inv_i) : 1'b0;
 
 endmodule

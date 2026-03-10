@@ -32,17 +32,13 @@
 
 module tb_compute_unit;
 
-    // --------------------------------------------------------
-    // [1] Clock & Reset
-    // --------------------------------------------------------
     reg clk;
     reg rst;
 
     always #5 clk = ~clk;
 
-    // --------------------------------------------------------
+
     // Memory interface wires (connect DUT ↔ memory modules)
-    // --------------------------------------------------------
     wire [`PC_WIDTH-1:0]              imem_addr;
     wire [`INST_WIDTH-1:0]            imem_rdata;
 
@@ -53,9 +49,8 @@ module tb_compute_unit;
     wire                              dmem_read_en;
     wire [`WARP_SIZE*`LANE_WIDTH-1:0] dmem_rdata_flat;
 
-    // --------------------------------------------------------
+
     // DUT
-    // --------------------------------------------------------
     compute_unit dut (
         .clk              (clk),
         .rst              (rst),
@@ -71,18 +66,17 @@ module tb_compute_unit;
         .dmem_rdata_flat_i(dmem_rdata_flat)
     );
 
-    // --------------------------------------------------------
+
     // Instruction Memory
-    // --------------------------------------------------------
     instruction_memory u_imem (
         .clk  (clk),
         .addr (imem_addr),
         .rdata(imem_rdata)
     );
 
-    // --------------------------------------------------------
+
+
     // Data Memory
-    // --------------------------------------------------------
     data_memory u_dmem (
         .clk         (clk),
         .addr_i      (dmem_addr_flat),
@@ -92,9 +86,7 @@ module tb_compute_unit;
         .read_data_o (dmem_rdata_flat)
     );
 
-    // ========================================================
-    // [2] Warp Scheduler - named signals for waveform
-    // ========================================================
+
     wire [`WARP_ID_W-1:0] sched_warp_id;      // warp selected this cycle
     wire                  sched_issue_valid;   // a valid warp was found
     wire [`PC_WIDTH-1:0]  sched_pc;           // PC of selected warp
@@ -103,12 +95,8 @@ module tb_compute_unit;
     assign sched_issue_valid= dut.wm_issue_valid;
     assign sched_pc         = dut.wm_pc;
 
-    // ========================================================
-    // [3] Pipeline Stage Tracking
-    // One warp-id and PC per stage boundary so you can watch
-    // an instruction march IF → ID → EX → MEM → WB
-    // ========================================================
-
+    // Pipeline Stage Tracking
+    
     // IF/ID boundary
     wire [`WARP_ID_W-1:0] if_warp_id;
     wire [`PC_WIDTH-1:0]  if_pc;

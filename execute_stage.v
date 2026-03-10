@@ -35,6 +35,7 @@ module execute_stage (
     input  wire                         mem_read_i,
     input  wire                         mem_write_i,
     input  wire                         branch_i,
+    input  wire                         branch_inv_i,
     input  wire                         exit_i,
 
     // =========================
@@ -54,6 +55,7 @@ module execute_stage (
     output reg                          mem_read_o,
     output reg                          mem_write_o,
     output reg                          branch_taken_o,
+    output reg [`PC_WIDTH-1:0]          branch_target_o,
     output reg                          exit_o
 );
 
@@ -70,6 +72,7 @@ module execute_stage (
         .alu_func_i(alu_func_i),
         .alu_src_imm_i(alu_src_imm_i),
         .branch_i(branch_i),
+        .branch_inv_i(branch_inv_i),
         .instr_class_i(3'b000), // not used anymore
         .result_flat_o(alu_result_w),
         .branch_taken_o(branch_taken_w)
@@ -99,20 +102,23 @@ module execute_stage (
     endgenerate
 
 
-    // EX/MEM Pipeline Register
+    // Branch Redirect — combinational
+    wire [`PC_WIDTH-1:0] branch_target_w;
+    assign branch_target_w = pc_i + {{(`PC_WIDTH-`IMM_W){imm_i[`IMM_W-1]}}, imm_i};
 
+
+
+    // EX/MEM Pipeline Register
     always @(posedge clk) begin
         if (rst) begin
             wid_o          <= 0;
             valid_o        <= 0;
             active_mask_o  <= 0;
             pc_o           <= 0;
-
             alu_result_o   <= 0;
             mem_addr_o     <= 0;
             store_data_o   <= 0;
             rd_o           <= 0;
-
             reg_write_o    <= 0;
             mem_read_o     <= 0;
             mem_write_o    <= 0;
@@ -124,16 +130,15 @@ module execute_stage (
             valid_o        <= valid_i;
             active_mask_o  <= active_mask_i;
             pc_o           <= pc_i;
-
             alu_result_o   <= alu_result_w;
             mem_addr_o     <= mem_addr_w;
             store_data_o   <= rt_flat_i;
             rd_o           <= rd_i;
-
             reg_write_o    <= reg_write_i;
             mem_read_o     <= mem_read_i;
             mem_write_o    <= mem_write_i;
             branch_taken_o <= branch_taken_w;
+            branch_target_o <= branch_target_w;
             exit_o         <= exit_i;
         end
     end
