@@ -3,20 +3,42 @@
 `include "top.v"
 
 // ============================================================
-// Testbench: tb_top
-// Description:
-//   Instantiates the top module (compute_unit + imem + dmem).
-//   Monitors warp commit events and store operations.
-//   Dumps final data memory contents after simulation.
+// Testbench: tb_compute_unit
+// Signal names match tb_compute_unit_behav.wcfg exactly so
+// the saved waveform configuration loads without remapping.
+//
+// Signals (17 total, matching wcfg):
+//   clk, rst
+//   sched_pc[15:0]
+//   if_pc[15:0]
+//   id_pc[15:0]
+//   ex_pc[15:0]
+//   mem_pc[15:0]
+//   wb_pc[15:0]
+//   ex_alu_lane0[31:0]
+//   ex_alu_lane1[31:0]
+//   ex_alu_lane2[31:0]
+//   ex_alu_lane3[31:0]
+//   dmem_write_en
+//   dmem_addr_lane0[31:0]
+//   dmem_wdata_lane0[31:0]
+//   warp_commit_en
+//   warp_commit_state[1:0]
 // ============================================================
 
-module tb_top;
+module tb_compute_unit;
 
+    // =========================================================
+    // Clock and reset
+    // =========================================================
     reg clk;
     reg rst;
 
+    initial clk = 0;
+    always  #5 clk = ~clk;
+
     // =========================================================
-    // DUT — top module contains compute_unit, imem, dmem
+    // DUT — top module contains compute_unit + imem + dmem
     // =========================================================
     top u_top (
         .clk(clk),
@@ -24,15 +46,57 @@ module tb_top;
     );
 
     // =========================================================
-    // Clock — 10ns period
+    // Waveform signals — named to match wcfg exactly
+    // All are aliases into the design hierarchy
     // =========================================================
-    initial clk = 0;
-    always  #5 clk = ~clk;
+
+    // Pipeline PC march
+    wire [`PC_WIDTH-1:0] sched_pc;
+    wire [`PC_WIDTH-1:0] if_pc;
+    wire [`PC_WIDTH-1:0] id_pc;
+    wire [`PC_WIDTH-1:0] ex_pc;
+    wire [`PC_WIDTH-1:0] mem_pc;
+    wire [`PC_WIDTH-1:0] wb_pc;
+
+    assign sched_pc = u_top.u_compute_unit.wm_pc;
+    assign if_pc    = u_top.u_compute_unit.if_id_pc;
+    assign id_pc    = u_top.u_compute_unit.id_ex_pc;
+    assign ex_pc    = u_top.u_compute_unit.ex_mem_pc;
+    assign mem_pc   = u_top.u_compute_unit.mem_wb_pc;
+    assign wb_pc    = u_top.u_compute_unit.mem_wb_pc;
+
+    // ALU results per lane (from EX/MEM register)
+    wire [31:0] ex_alu_lane0;
+    wire [31:0] ex_alu_lane1;
+    wire [31:0] ex_alu_lane2;
+    wire [31:0] ex_alu_lane3;
+
+    assign ex_alu_lane0 = u_top.u_compute_unit.ex_mem_alu_result[1*32-1 -: 32];
+    assign ex_alu_lane1 = u_top.u_compute_unit.ex_mem_alu_result[2*32-1 -: 32];
+    assign ex_alu_lane2 = u_top.u_compute_unit.ex_mem_alu_result[3*32-1 -: 32];
+    assign ex_alu_lane3 = u_top.u_compute_unit.ex_mem_alu_result[4*32-1 -: 32];
+
+    // Data memory interface
+    wire                  dmem_write_en;
+    wire [31:0]           dmem_addr_lane0;
+    wire [31:0]           dmem_wdata_lane0;
+
+    assign dmem_write_en   = u_top.u_compute_unit.dmem_write_en_o;
+    assign dmem_addr_lane0 = u_top.u_compute_unit.dmem_addr_flat_o[1*32-1 -: 32];
+    assign dmem_wdata_lane0= u_top.u_compute_unit.dmem_wdata_flat_o[1*32-1 -: 32];
+
+    // Warp commit interface
+    wire                  warp_commit_en;
+    wire [1:0]            warp_commit_state;
+
+    assign warp_commit_en    = u_top.u_compute_unit.warp_update_en;
+    assign warp_commit_state = u_top.u_compute_unit.warp_update_state;
 
     // =========================================================
-    // Warp commit monitor
-    // Watches the warp manager write interface inside top
+    // Console monitors
     // =========================================================
+
+    // Warp commit
     always @(posedge clk) begin
         if (u_top.u_compute_unit.warp_update_en) begin
             if (u_top.u_compute_unit.warp_update_state == `WARP_DONE)
@@ -49,59 +113,47 @@ module tb_top;
         end
     end
 
-    // =========================================================
     // Store monitor
-    // Watches data memory write interface
-    // =========================================================
     integer i;
     always @(posedge clk) begin
         if (u_top.u_compute_unit.dmem_write_en_o) begin
             for (i = 0; i < `WARP_SIZE; i = i + 1) begin
-                if (u_top.u_compute_unit.dmem_write_mask_o[i]) begin
+                if (u_top.u_compute_unit.dmem_write_mask_o[i])
                     $display("[STORE]  T=%0t | lane%0d | addr=%0d | data=%0d",
                         $time,
                         i,
-                        u_top.u_compute_unit.dmem_addr_flat_o[(i+1)*`LANE_WIDTH-1 -: `LANE_WIDTH],
+                        u_top.u_compute_unit.dmem_addr_flat_o [(i+1)*`LANE_WIDTH-1 -: `LANE_WIDTH],
                         u_top.u_compute_unit.dmem_wdata_flat_o[(i+1)*`LANE_WIDTH-1 -: `LANE_WIDTH]);
-                end
             end
         end
     end
 
-    // =========================================================
-    // Branch monitor
-    // Watches for taken branches to show redirect in console
-    // =========================================================
+    // Branch taken monitor (gated with valid)
     always @(posedge clk) begin
-        if (u_top.u_compute_unit.ex_mem_branch_taken) begin
+        if (u_top.u_compute_unit.ex_mem_branch_taken
+         && u_top.u_compute_unit.ex_mem_valid)
             $display("[BRANCH] T=%0t | Warp %0d | PC=%04h | TAKEN → target=%04h",
                 $time,
                 u_top.u_compute_unit.ex_mem_wid,
                 u_top.u_compute_unit.ex_mem_pc,
                 u_top.u_compute_unit.ex_mem_branch_target);
-        end
     end
 
     // =========================================================
     // Simulation control
     // =========================================================
+    integer j;
     initial begin
         rst = 1;
         #20 rst = 0;
-
-        // Run long enough for loop program to complete
-        // 7 instructions x 4 iterations x 4 warps x ~10 cycles + margin
         #2500;
 
         $display("");
         $display("--------------------------------------------------");
         $display("Simulation complete. Final memory contents:");
         $display("--------------------------------------------------");
-
-        for (i = 0; i < 16; i = i + 1) begin
-            $display("  mem[%02d] = %0d", i, u_top.u_data_memory.mem[i]);
-        end
-
+        for (j = 0; j < 16; j = j + 1)
+            $display("  mem[%02d] = %0d", j, u_top.u_data_memory.mem[j]);
         $display("--------------------------------------------------");
         $finish;
     end
