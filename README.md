@@ -20,6 +20,31 @@ WarpForge is intended for:
 
 ---
 
+# Table of Contents
+
+- [Overview](#overview)
+- [Repository Structure](#repository-structure)
+- [Architectural Philosophy](#architectural-philosophy)
+- [Top-Level Architecture](#top-level-architecture)
+- [Pipeline](#pipeline)
+- [Compute Unit Configuration](#compute-unit-configuration)
+- [Warp Scheduling](#warp-scheduling)
+- [Special Registers](#special-registers)
+- [ISA](#isa)
+- [Branch Model](#branch-model)
+- [Memory Model](#memory-model)
+- [Key Design Decisions](#key-design-decisions)
+- [RTL File Structure](#rtl-file-structure)
+- [Verified Programs](#verified-programs)
+- [Simulation Output](#simulation-output)
+- [How to Simulate](#how-to-simulate)
+- [Synthesis Results](#synthesis-results-vivado-xilinx-7-series)
+- [Concepts Demonstrated](#concepts-demonstrated)
+- [Future Work](#future-work)
+- [Educational Goal](#educational-goal)
+
+---
+
 # Overview
 
 Modern GPUs execute thousands of threads by grouping them into lockstep execution units called **warps** (or wavefronts). WarpForge reproduces this core idea using:
@@ -35,6 +60,48 @@ Modern GPUs execute thousands of threads by grouping them into lockstep executio
 Each warp maintains its own program counter and register context, while a scheduler interleaves warp issue to hide instruction latency.
 
 The design deliberately avoids industrial complexity such as scoreboards, caches, and divergence stacks so that the execution model remains transparent.
+
+---
+
+# Repository Structure
+
+```text
+warpforge-simt-gpu-core/
+├── docs/
+├── rtl/
+│   ├── alu/
+│   │   └── vector_ALU.v
+│   ├── core/
+│   │   ├── compute_unit.v
+│   │   └── top.v
+│   ├── include/
+│   │   └── cu_defs.vh
+│   ├── memory/
+│   │   ├── data_memory.v
+│   │   └── instruction_memory.v
+│   ├── pipeline/
+│   │   ├── decode_unit.v
+│   │   ├── execute_stage.v
+│   │   ├── IFU.v
+│   │   ├── mem_stage.v
+│   │   └── writeback_stage.v
+│   ├── register_file/
+│   │   └── vector_register_file.v
+│   └── warp/
+│       └── warp_manager.v
+├── sim/
+│   ├── programs/
+│   │   ├── data.mem
+│   │   └── program.mem
+│   └── run/
+│       ├── run_icarus.bat      ← Windows simulation script
+│       └── run_icarus.sh       ← Linux/macOS simulation script
+├── tb/
+│   └── unit/
+│       └── tb_compute_unit.v
+├── .gitignore
+└── README.md
+```
 
 ---
 
@@ -490,24 +557,89 @@ All 16 logical threads complete correctly.
 
 # How to Simulate
 
+## Prerequisites
+
+Install one of the following simulators:
+
+* **Icarus Verilog** — [http://iverilog.icarus.com](http://iverilog.icarus.com) (free, cross-platform)
+* **Vivado Simulator** — included with Xilinx Vivado (recommended for FPGA synthesis flow)
+
+Make sure `iverilog` and `vvp` are added to your system PATH after installation.
+
 ---
 
-# Vivado
+## Icarus Verilog — Windows
 
-1. Create RTL project
-2. Add all Verilog source files
-3. Add `program.mem`
-4. Set `tb_compute_unit.v` as simulation top
+Navigate to the `sim/run/` folder and run:
+
+```bat
+.\run_icarus.bat
+```
+
+The script compiles all RTL sources and launches the simulation automatically.
+
+To run manually from the `sim/run/` directory:
+
+```bat
+iverilog -o sim.out -I ..\..\rtl\include ..\..\rtl\core\top.v ..\..\rtl\core\compute_unit.v ..\..\rtl\warp\warp_manager.v ..\..\rtl\pipeline\IFU.v ..\..\rtl\pipeline\decode_unit.v ..\..\rtl\pipeline\execute_stage.v ..\..\rtl\pipeline\mem_stage.v ..\..\rtl\pipeline\writeback_stage.v ..\..\rtl\alu\vector_alu.v ..\..\rtl\register_file\vector_register_file.v ..\..\rtl\memory\instruction_memory.v ..\..\rtl\memory\data_memory.v ..\..\tb\unit\tb_compute_unit.v
+cd ..
+vvp run\sim.out
+```
+
+> **Note:** `vvp` must be run from the `sim/` directory so that `$readmemh` can locate `programs/program.mem` and `programs/data.mem` correctly.
+
+---
+
+## Icarus Verilog — Linux / macOS
+
+Navigate to the `sim/run/` folder and run:
+
+```bash
+chmod +x run_icarus.sh
+./run_icarus.sh
+```
+
+To run manually from the `sim/run/` directory:
+
+```bash
+iverilog -o sim.out -I ../../rtl/include \
+  ../../rtl/core/top.v \
+  ../../rtl/core/compute_unit.v \
+  ../../rtl/warp/warp_manager.v \
+  ../../rtl/pipeline/IFU.v \
+  ../../rtl/pipeline/decode_unit.v \
+  ../../rtl/pipeline/execute_stage.v \
+  ../../rtl/pipeline/mem_stage.v \
+  ../../rtl/pipeline/writeback_stage.v \
+  ../../rtl/alu/vector_alu.v \
+  ../../rtl/register_file/vector_register_file.v \
+  ../../rtl/memory/instruction_memory.v \
+  ../../rtl/memory/data_memory.v \
+  ../../tb/unit/tb_compute_unit.v
+
+cd ..
+vvp run/sim.out
+```
+
+---
+
+## Vivado
+
+1. Create a new RTL project in Vivado
+2. Add all `.v` files from the `rtl/` directory as design sources
+3. Add `sim/programs/program.mem` and `sim/programs/data.mem` as simulation sources
+4. Set `tb/unit/tb_compute_unit.v` as the simulation top module
 5. Run behavioral simulation
 
 ---
 
-# Icarus Verilog
+## Changing the Test Program
 
-```bash
-iverilog -o sim *.v
-vvp sim
-```
+Edit `sim/programs/program.mem` to load a different instruction sequence.
+
+Refer to the [ISA](#isa) section for instruction encoding.
+
+The `sim/programs/data.mem` file pre-initializes the data memory. Clear it or modify it as needed for your program.
 
 ---
 
