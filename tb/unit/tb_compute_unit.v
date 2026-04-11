@@ -1,7 +1,5 @@
 `timescale 1ns/1ps
 `include "cu_defs.vh"
-`include "top.v"
-
 // ============================================================
 // Testbench: tb_compute_unit
 // Signal names match tb_compute_unit_behav.wcfg exactly so

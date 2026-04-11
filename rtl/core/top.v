@@ -1,9 +1,6 @@
 // Top module
 
 `include "cu_defs.vh"
-`include "data_memory.v"
-`include "instruction_memory.v"
-`include "compute_unit.v"
 module top (
     input wire clk,
     input wire rst

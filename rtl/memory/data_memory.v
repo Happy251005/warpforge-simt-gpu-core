@@ -25,7 +25,7 @@ module data_memory (
     reg [`LANE_WIDTH-1:0] mem [0:1023];
 
     initial begin
-        $readmemh("data.mem", mem);
+        $readmemh("programs/data.mem", mem);
     end
 
     genvar lane;

@@ -8,8 +8,7 @@
 //   - No stalls (v1)
 // ============================================================
 
-`include "cu_defs.vh"
-`include "vector_ALU.v"
+`include "cu_defs.vh" 
 
 module execute_stage (
 

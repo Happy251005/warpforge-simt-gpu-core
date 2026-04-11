@@ -21,7 +21,7 @@ module instruction_memory (
 
     // Memory Initialization
     initial begin
-        $readmemh("program.mem", mem);
+        $readmemh("programs/program.mem", mem);
     end
 
     // Read logic

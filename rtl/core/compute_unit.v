@@ -10,13 +10,6 @@
 // ============================================================
 
 `include "cu_defs.vh"
-`include "warp_manager.v"
-`include "IFU.v"
-`include "decode_unit.v"
-`include "execute_stage.v"
-`include "mem_stage.v"
-`include "writeback_stage.v"
-`include "vector_register_file.v"
 
 module compute_unit (
 
