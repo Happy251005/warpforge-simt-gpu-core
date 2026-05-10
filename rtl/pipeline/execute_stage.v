@@ -42,7 +42,6 @@ module execute_stage (
     output reg  [`WARP_ID_W-1:0]        wid_o,
     output reg                          valid_o,
     output reg  [`MASK_W-1:0]           active_mask_o,
-    output reg  [`PC_WIDTH-1:0]         pc_o,
 
     output reg  [`WARP_SIZE*`LANE_WIDTH-1:0] alu_result_o,
     output reg  [`WARP_SIZE*`LANE_WIDTH-1:0] mem_addr_o,
@@ -113,7 +112,6 @@ module execute_stage (
             wid_o          <= 0;
             valid_o        <= 0;
             active_mask_o  <= 0;
-            pc_o           <= 0;
             alu_result_o   <= 0;
             mem_addr_o     <= 0;
             store_data_o   <= 0;
@@ -128,7 +126,6 @@ module execute_stage (
             wid_o          <= wid_i;
             valid_o        <= valid_i;
             active_mask_o  <= active_mask_i;
-            pc_o           <= pc_i;
             alu_result_o   <= alu_result_w;
             mem_addr_o     <= mem_addr_w;
             store_data_o   <= rt_flat_i;

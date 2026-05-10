@@ -59,9 +59,9 @@ module tb_compute_unit;
     assign sched_pc = u_top.u_compute_unit.wm_pc;
     assign if_pc    = u_top.u_compute_unit.if_id_pc;
     assign id_pc    = u_top.u_compute_unit.id_ex_pc;
-    assign ex_pc    = u_top.u_compute_unit.ex_mem_pc;
-    assign mem_pc   = u_top.u_compute_unit.mem_wb_pc;
-    assign wb_pc    = u_top.u_compute_unit.mem_wb_pc;
+    assign ex_pc  = u_top.u_compute_unit.ex_mem_alu_result[1*32-1 -: 32]; // or remove
+    assign mem_pc = u_top.u_compute_unit.mem_wb_result[1*32-1 -: 32];     // or remove
+    assign wb_pc  = mem_pc;
 
     // ALU results per lane (from EX/MEM register)
     wire [31:0] ex_alu_lane0;
@@ -84,11 +84,10 @@ module tb_compute_unit;
     assign dmem_wdata_lane0= u_top.u_compute_unit.dmem_wdata_flat_o[1*32-1 -: 32];
 
     // Warp commit interface
-    wire                  warp_commit_en;
-    wire [1:0]            warp_commit_state;
 
-    assign warp_commit_en    = u_top.u_compute_unit.warp_update_en;
-    assign warp_commit_state = u_top.u_compute_unit.warp_update_state;
+
+    wire warp_commit_en    = u_top.u_compute_unit.exit_en;
+    wire warp_commit_state = u_top.u_compute_unit.sb_stall; // or remove
 
     // =========================================================
     // Console monitors
@@ -96,18 +95,16 @@ module tb_compute_unit;
 
     // Warp commit
     always @(posedge clk) begin
-        if (u_top.u_compute_unit.warp_update_en) begin
-            if (u_top.u_compute_unit.warp_update_state == `WARP_DONE)
-                $display("[COMMIT] T=%0t | Warp %0d | PC=%04h | --> DONE",
-                    $time,
-                    u_top.u_compute_unit.warp_update_wid,
-                    u_top.u_compute_unit.mem_wb_pc);
-            else
-                $display("[COMMIT] T=%0t | Warp %0d | PC=%04h | --> READY  next_pc=%04h",
-                    $time,
-                    u_top.u_compute_unit.warp_update_wid,
-                    u_top.u_compute_unit.mem_wb_pc,
-                    u_top.u_compute_unit.warp_update_pc);
+        if (u_top.u_compute_unit.exit_en) begin
+            $display("[COMMIT] T=%0t | Warp %0d | --> DONE",
+                $time,
+                u_top.u_compute_unit.exit_wid);
+        end
+
+        if (u_top.u_compute_unit.clear_en) begin
+            $display("[COMMIT] T=%0t | Warp %0d | --> READY",
+                $time,
+                u_top.u_compute_unit.clear_wid);
         end
     end
 
@@ -133,9 +130,38 @@ module tb_compute_unit;
             $display("[BRANCH] T=%0t | Warp %0d | PC=%04h | TAKEN → target=%04h",
                 $time,
                 u_top.u_compute_unit.ex_mem_wid,
-                u_top.u_compute_unit.ex_mem_pc,
+                mem_pc,
                 u_top.u_compute_unit.ex_mem_branch_target);
     end
+
+    // Branch commit monitor
+    always @(posedge clk) begin
+        if (u_top.u_compute_unit.branch_commit)
+            $display("[BRANCH_COMMIT] T=%0t | Warp %0d | target=%04h",
+                $time,
+                u_top.u_compute_unit.branch_wid,
+                u_top.u_compute_unit.branch_target);
+    end
+
+always @(posedge clk) begin
+    if (u_top.u_compute_unit.wm_issue_valid)
+        $display("[ISSUE] T=%0t | Warp %0d | PC=%04h | rr_ptr=%0d",
+            $time,
+            u_top.u_compute_unit.wm_wid,
+            u_top.u_compute_unit.wm_pc,
+            u_top.u_compute_unit.u_warp_manager.rr_ptr);
+end
+
+    // Scoreboard stall monitor
+always @(posedge clk) begin
+    if (u_top.u_compute_unit.sb_stall)
+        $display("[SB_STALL] T=%0t | Warp %0d | cause=%0d | rs=%0d | rt=%0d",
+            $time,
+            u_top.u_compute_unit.sb_stall_wid,
+            u_top.u_compute_unit.sb_stall_cause,
+            u_top.u_compute_unit.sb_check_rs,
+            u_top.u_compute_unit.sb_check_rt);
+end
 
     // =========================================================
     // Simulation control
@@ -144,7 +170,7 @@ module tb_compute_unit;
     initial begin
         rst = 1;
         #20 rst = 0;
-        #2500;
+        #4500;
 
         $display("");
         $display("--------------------------------------------------");

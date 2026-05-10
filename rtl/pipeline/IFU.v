@@ -15,6 +15,10 @@ module instruction_fetch (
     input  wire [`PC_WIDTH-1:0]      current_pc,
     input  wire [`MASK_W-1:0]        current_active_mask,
 
+    // Squash signal
+    input  wire                      squash,
+    input  wire [`WARP_ID_W-1:0]     squash_wid,
+
     // To Instruction Memory
     output wire [`PC_WIDTH-1:0]      imem_addr,
     input  wire [`INST_WIDTH-1:0]    imem_rdata,
@@ -41,9 +45,13 @@ module instruction_fetch (
         else begin
             if_instruction <= imem_rdata;
             if_wid <= current_wid;
-            if_valid <= issue_valid;
             if_active_mask <= current_active_mask;
             if_pc <= current_pc;
+
+            if(squash && squash_wid == current_wid)
+                if_valid <= 0;
+            else
+                if_valid <= issue_valid;
         end
     end
 endmodule

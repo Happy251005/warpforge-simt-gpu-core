@@ -6,6 +6,7 @@
 //   - Set at decode when reg_write instruction is issued
 //   - Cleared at writeback when result is committed to VRF
 //   - Combinational stall output gates ID/EX pipeline register
+//   - Stalls warp on branch instruction until resolution
 //   - Handles RAW hazards
 //   - REG_ZERO never marked busy
 // ============================================================
@@ -31,10 +32,12 @@ module scoreboard (
     input  wire [`REG_ID_W-1:0]   check_rt,
     input wire                    check_alu_src_imm,
     input wire                    check_valid,
+    input wire                    branch_instr, // Indicates if the instruction is a branch (for stalling until resolution)
 
     // Output
     output wire                   stall,
-    output wire [`WARP_ID_W-1:0]  stall_wid
+    output wire [`WARP_ID_W-1:0]  stall_wid,
+    output wire                   stall_cause // 0: register conflict, 1: branch
 );
 
     reg [`NUM_VREGS-1:0] busy_table [`NUM_WARPS-1:0]; // 2D array: [warp][reg]
@@ -60,9 +63,10 @@ end
     // Stall logic (combinational)
     wire rs_busy = (check_rs == `REG_ZERO) ? 1'b0 : busy_table[check_wid][check_rs];
     wire rt_busy = (check_rt == `REG_ZERO) ? 1'b0 : busy_table[check_wid][check_rt];
-    wire hazard  = check_valid && (rs_busy || (rt_busy && !check_alu_src_imm));
+    wire hazard  = check_valid && (rs_busy || (rt_busy && !check_alu_src_imm) || branch_instr);
 
     assign stall     = hazard;
     assign stall_wid = check_wid;
+    assign stall_cause = branch_instr;
 
 endmodule

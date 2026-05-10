@@ -6,7 +6,8 @@
 //   - External instruction memory interface
 //   - External data memory interface
 //   - Internal warp manager + VRF
-//   - No stalls / no divergence (v1)
+//   - Scoreboard-based hazard detection
+//   - Branch stall with IFU squash
 // ============================================================
 
 `include "cu_defs.vh"
@@ -39,6 +40,28 @@ module compute_unit (
     wire                     wm_issue_valid;
     wire [`PC_WIDTH-1:0]     wm_pc;
     wire [`MASK_W-1:0]       wm_active_mask;
+
+    // Scoreboard -> Warp Manager
+    wire                         sb_stall;
+    wire [`WARP_ID_W-1:0]        sb_stall_wid;
+    wire                         sb_stall_cause;
+
+    // Squash signal to IFU
+    wire                         sb_squash;
+    wire [`WARP_ID_W-1:0]        sb_squash_wid;
+
+    // Decode → Scoreboard (set port)
+    wire                         sb_set_en;
+    wire [`WARP_ID_W-1:0]        sb_set_wid;
+    wire [`REG_ID_W-1:0]         sb_set_rd;
+
+    // Decode → Scoreboard (check port)
+    wire [`WARP_ID_W-1:0]        sb_check_wid;
+    wire [`REG_ID_W-1:0]         sb_check_rs;
+    wire [`REG_ID_W-1:0]         sb_check_rt;
+    wire                         sb_check_alu_src_imm;
+    wire                         sb_check_valid;
+    wire                         sb_branch_instr;
 
     // IF/ID
     wire [`INST_WIDTH-1:0]   if_id_inst;
@@ -75,7 +98,6 @@ module compute_unit (
     wire [`WARP_ID_W-1:0]    ex_mem_wid;
     wire                     ex_mem_valid;
     wire [`MASK_W-1:0]       ex_mem_mask;
-    wire [`PC_WIDTH-1:0]     ex_mem_pc;
     wire [`PC_WIDTH-1:0]     ex_mem_branch_target;
     wire                     ex_mem_branch_taken;
 
@@ -93,7 +115,6 @@ module compute_unit (
     wire [`WARP_ID_W-1:0]    mem_wb_wid;
     wire                     mem_wb_valid;
     wire [`MASK_W-1:0]       mem_wb_mask;
-    wire [`PC_WIDTH-1:0]     mem_wb_pc;
 
     wire [`WARP_SIZE*`LANE_WIDTH-1:0] mem_wb_result;
     wire [`REG_ID_W-1:0]     mem_wb_rd;
@@ -110,28 +131,71 @@ module compute_unit (
     wire [`MASK_W-1:0]       vrf_write_mask;
 
     // WB → Warp Manager
-    wire                     warp_update_en;
-    wire [`WARP_ID_W-1:0]    warp_update_wid;
-    wire [`WARP_STATE_W-1:0] warp_update_state;
-    wire [`PC_WIDTH-1:0]     warp_update_pc;
-    wire [`MASK_W-1:0]       warp_update_mask;
+    wire                         branch_commit;
+    wire [`WARP_ID_W-1:0]        branch_wid;
+    wire [`PC_WIDTH-1:0]         branch_target;
+    wire [`MASK_W-1:0]           branch_mask;
+    wire                         exit_en;
+    wire [`WARP_ID_W-1:0]        exit_wid;
+
+    // WB → Scoreboard
+    wire                         clear_en;
+    wire [`WARP_ID_W-1:0]        clear_wid;
+    wire [`REG_ID_W-1:0]         clear_rd;
+
+    // Squash logic for IFU
+    assign sb_squash     = sb_stall & sb_stall_cause;
+    assign sb_squash_wid = sb_stall_wid;
         
     // Warp Manager
     warp_manager u_warp_manager (
     .clk(clk),
     .rst(rst),
 
-    .write_en(warp_update_en),
-    .write_wid(warp_update_wid),
-    .write_pc(warp_update_pc), 
-    .write_active_mask(warp_update_mask),
-    .write_warp_state(warp_update_state),
+    .branch_commit(branch_commit),
+    .branch_wid(branch_wid),
+    .branch_target(branch_target),
+    .branch_mask(branch_mask),
+
+    .clear_en(clear_en),
+    .clear_wid(clear_wid),
+
+    .exit_en(exit_en),
+    .exit_wid(exit_wid),
+
+    .scoreboard_stall(sb_stall),
+    .scoreboard_stall_wid(sb_stall_wid),
+    .scoreboard_stall_cause(sb_stall_cause),
 
     .current_wid(wm_wid),
     .issue_valid(wm_issue_valid),
     .current_pc(wm_pc),
     .current_active_mask(wm_active_mask)
     );
+
+    scoreboard u_scoreboard (
+    .clk(clk),
+    .rst(rst),
+
+    .set_en(sb_set_en),
+    .set_wid(sb_set_wid),
+    .set_rd(sb_set_rd),
+
+    .clear_en(clear_en),
+    .clear_wid(clear_wid),
+    .clear_rd(clear_rd),
+
+    .check_wid(sb_check_wid),
+    .check_rs(sb_check_rs),
+    .check_rt(sb_check_rt),
+    .check_alu_src_imm(sb_check_alu_src_imm),
+    .check_valid(sb_check_valid),
+    .branch_instr(sb_branch_instr),
+
+    .stall(sb_stall),
+    .stall_wid(sb_stall_wid),
+    .stall_cause(sb_stall_cause)
+);
 
     instruction_fetch u_ifu (
     .clk(clk),
@@ -142,6 +206,10 @@ module compute_unit (
     .current_wid(wm_wid),
     .current_pc(wm_pc),
     .current_active_mask(wm_active_mask),
+
+    // Squash signal from scoreboard
+    .squash(sb_squash),
+    .squash_wid(sb_squash_wid),
 
     // Instruction memory
     .imem_addr(imem_addr_o),
@@ -165,6 +233,18 @@ module compute_unit (
     .if_valid_i(if_id_valid),
     .if_active_mask_i(if_id_mask),
     .if_pc_i(if_id_pc),
+    .stall_i(sb_stall),
+
+    .set_en(sb_set_en),
+    .set_wid(sb_set_wid),
+    .set_rd(sb_set_rd),
+    .branch_instr(sb_branch_instr),
+
+    .check_valid(sb_check_valid),
+    .check_wid(sb_check_wid),
+    .check_rs(sb_check_rs),
+    .check_rt(sb_check_rt),
+    .check_alu_src_imm(sb_check_alu_src_imm),
 
     .wid_o(id_ex_wid),
     .valid_o(id_ex_valid),
@@ -177,8 +257,8 @@ module compute_unit (
     .imm_o(id_ex_imm),
 
     .alu_func_o(id_ex_alu_func),
-    .alu_src_imm_o(id_ex_alu_src_imm),
 
+    .alu_src_imm_o(id_ex_alu_src_imm),
     .reg_write_o(id_ex_reg_write),
     .mem_read_o(id_ex_mem_read),
     .mem_write_o(id_ex_mem_write),
@@ -237,7 +317,6 @@ module compute_unit (
     .wid_o(ex_mem_wid),
     .valid_o(ex_mem_valid),
     .active_mask_o(ex_mem_mask),
-    .pc_o(ex_mem_pc),
 
     .alu_result_o(ex_mem_alu_result),
     .mem_addr_o(ex_mem_mem_addr),
@@ -262,7 +341,6 @@ module compute_unit (
     .wid_i(ex_mem_wid),
     .valid_i(ex_mem_valid),
     .active_mask_i(ex_mem_mask),
-    .pc_i(ex_mem_pc),
 
     .alu_result_i(ex_mem_alu_result),
     .mem_addr_i(ex_mem_mem_addr),
@@ -290,7 +368,6 @@ module compute_unit (
     .wid_o(mem_wb_wid),
     .valid_o(mem_wb_valid),
     .active_mask_o(mem_wb_mask),
-    .pc_o(mem_wb_pc),        
 
     .result_o(mem_wb_result),
     .rd_o(mem_wb_rd),
@@ -303,14 +380,10 @@ module compute_unit (
 
     // Writeback Stage
     writeback_stage u_wb (
-    .clk(clk),
-    .rst(rst),
 
     .wid_i(mem_wb_wid),
     .valid_i(mem_wb_valid),
     .active_mask_i(mem_wb_mask),
-    .pc_i(mem_wb_pc),
-
     .result_i(mem_wb_result),
     .rd_i(mem_wb_rd),
     .reg_write_i(mem_wb_reg_write),
@@ -324,11 +397,16 @@ module compute_unit (
     .vrf_write_data_o(vrf_write_data),
     .vrf_write_mask_o(vrf_write_mask),
 
-    .warp_update_en_o(warp_update_en),
-    .warp_update_wid_o(warp_update_wid),
-    .warp_update_state_o(warp_update_state),
-    .warp_update_pc_o(warp_update_pc),
-    .warp_update_mask_o(warp_update_mask)
-    );
+    .branch_commit_o(branch_commit),
+    .branch_wid_o(branch_wid),
+    .branch_target_o(branch_target),
+    .branch_mask_o(branch_mask),
 
+    .clear_en_o(clear_en),
+    .clear_wid_o(clear_wid),
+    .clear_rd_o(clear_rd),
+
+    .exit_en_o(exit_en),
+    .exit_wid_o(exit_wid)
+    );
 endmodule

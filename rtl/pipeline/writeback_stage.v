@@ -3,22 +3,19 @@
 // Description:
 //   WB stage of 5-stage SIMT pipeline
 //   - Writes ALU or LOAD result to VRF
-//   - Marks warp DONE on EXIT
-//   - No branch PC correction (v1)
+//   - Fires branch commit to warp manager on taken branch
+//   - Fires scoreboard clear on reg-writing instruction commit
+//   - Fires exit signal to warp manager on EXIT instruction
 // ============================================================
 
 `include "cu_defs.vh"
 
 module writeback_stage (
 
-    input  wire                         clk,
-    input  wire                         rst,
-
     // From MEM/WB
     input  wire [`WARP_ID_W-1:0]        wid_i,
     input  wire                         valid_i,
     input  wire [`MASK_W-1:0]           active_mask_i,
-    input  wire [`PC_WIDTH-1:0]         pc_i,
 
     input  wire [`WARP_SIZE*`LANE_WIDTH-1:0] result_i,
     input  wire [`REG_ID_W-1:0]         rd_i,
@@ -37,14 +34,20 @@ module writeback_stage (
     output wire [`WARP_SIZE*`LANE_WIDTH-1:0] vrf_write_data_o,
     output wire [`MASK_W-1:0]           vrf_write_mask_o,
 
+    // Branch commit interface (to warp manager)
+    output wire                         branch_commit_o,
+    output wire [`WARP_ID_W-1:0]        branch_wid_o,
+    output wire [`PC_WIDTH-1:0]         branch_target_o,
+    output wire [`MASK_W-1:0]           branch_mask_o,
 
-    // To Warp Manager
+    // Scoreboard clear interface
+    output wire                         clear_en_o,
+    output wire [`WARP_ID_W-1:0]        clear_wid_o,
+    output wire [`REG_ID_W-1:0]         clear_rd_o,
 
-    output reg                          warp_update_en_o,
-    output reg  [`WARP_ID_W-1:0]        warp_update_wid_o,
-    output reg  [`WARP_STATE_W-1:0]     warp_update_state_o,
-    output reg  [`PC_WIDTH-1:0]         warp_update_pc_o,
-    output reg  [`MASK_W-1:0]           warp_update_mask_o
+    // Exit interface (to warp manager)
+    output wire                         exit_en_o,
+    output wire [`WARP_ID_W-1:0]        exit_wid_o
 
 );
 
@@ -57,34 +60,20 @@ module writeback_stage (
     assign vrf_write_mask_o = active_mask_i;
 
 
-    // Commit PC selection
-    // Branch taken → branch_target, everything else → pc + 4
-    wire [`PC_WIDTH-1:0] commit_pc;
-    assign commit_pc = branch_taken_i ? branch_target_i : pc_i + 4;
+    // Branch commit — fires when valid branch is taken
+    assign branch_commit_o  = valid_i & branch_taken_i;
+    assign branch_wid_o     = wid_i;
+    assign branch_target_o  = branch_target_i;
+    assign branch_mask_o    = active_mask_i;
 
-    // EXIT Handling
+    // Scoreboard clear — fires when valid reg-writing instruction commits
+    assign clear_en_o       = valid_i & reg_write_i & (rd_i != `REG_ZERO);
+    assign clear_wid_o      = wid_i;
+    assign clear_rd_o       = rd_i;
 
-    always @(posedge clk) begin
-        if (rst) begin
-            warp_update_en_o    <= 0;
-            warp_update_wid_o   <= 0;
-            warp_update_state_o <= `WARP_READY;
-            warp_update_pc_o    <= 0;
-            warp_update_mask_o  <= `FULL_MASK;
-        end
-        else begin
-            if (valid_i) begin
-                warp_update_en_o    <= 1;
-                warp_update_wid_o   <= wid_i;
-                warp_update_mask_o  <= active_mask_i;
-                warp_update_pc_o    <= commit_pc;
-                warp_update_state_o <= exit_i ? `WARP_DONE : `WARP_READY;
-            end
-            else begin
-                warp_update_en_o <= 0;
-            end
-        end
-    end
+    // Exit — fires when valid EXIT instruction commits
+    assign exit_en_o        = valid_i & exit_i;
+    assign exit_wid_o       = wid_i;
 
 
 

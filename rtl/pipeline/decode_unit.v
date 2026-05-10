@@ -20,6 +20,20 @@ module decode_unit (
     input  wire [`MASK_W-1:0]           if_active_mask_i,
     input  wire [`PC_WIDTH-1:0]         if_pc_i,
 
+    // From Scoreboard
+    input  wire                         stall_i,
+
+    // To Scoreboard
+    output wire                         set_en,
+    output wire [`WARP_ID_W-1:0]        set_wid,
+    output wire [`REG_ID_W-1:0]         set_rd,
+    output wire                         branch_instr,
+    output wire                         check_valid,
+    output wire [`WARP_ID_W-1:0]        check_wid,
+    output wire [`REG_ID_W-1:0]         check_rs,
+    output wire [`REG_ID_W-1:0]         check_rt,
+    output wire                         check_alu_src_imm,
+
     // ===============================
     // ID/EX Pipeline Outputs
     // ===============================
@@ -34,9 +48,6 @@ module decode_unit (
     output reg  [`REG_ID_W-1:0]         rt_o,
     output reg  [`REG_ID_W-1:0]         rd_o,
     output reg  [`IMM_W-1:0]            imm_o,
-
-    // Instruction class (opcode[5:3])
-    output reg  [2:0]                   instr_class_o,
 
     // ALU function
     output reg  [`FUNC_W-1:0]           alu_func_o,
@@ -59,7 +70,6 @@ module decode_unit (
     wire [`REG_ID_W-1:0] rd_d  = instr_i[15:11];
     wire [`IMM_W-1:0]    imm_d = instr_i[15:0];
 
-    wire [2:0] instr_class_d = opcode[5:3];
 
 
     reg reg_write_d;
@@ -71,6 +81,22 @@ module decode_unit (
     reg alu_src_imm_d;
     reg exit_d;
     reg rd_use_rt_d;  // For I-type: dest is rt, not rd
+
+
+    // Scoreboard set — fires when valid reg-writing instruction passes decode
+    assign set_en          = if_valid_i & reg_write_d & ((rd_use_rt_d ? rt_d : rd_d) != `REG_ZERO) & !stall_i;
+    assign set_wid         = if_wid_i;
+    assign set_rd          = rd_use_rt_d ? rt_d : rd_d;
+
+    // Scoreboard check — combinational from incoming instruction
+    assign check_valid     = if_valid_i;
+    assign check_wid       = if_wid_i;
+    assign check_rs        = rs_d;
+    assign check_rt        = rt_d;
+    assign check_alu_src_imm = alu_src_imm_d;
+
+    // Branch detection
+    assign branch_instr    = if_valid_i & branch_d;
 
 
     always @(*) begin
@@ -143,7 +169,6 @@ module decode_unit (
             rd_o          <= 0;
             imm_o         <= 0;
 
-            instr_class_o <= 0;
             alu_func_o    <= 0;
 
             alu_src_imm_o <= 0;
@@ -157,7 +182,7 @@ module decode_unit (
         else begin
             // SIMT identity propagation
             wid_o         <= if_wid_i;
-            valid_o       <= if_valid_i;
+            valid_o       <= if_valid_i & !(stall_i & !branch_instr); // Kill valid bit if stalled (bubble)
             active_mask_o <= if_active_mask_i;
             pc_o          <= if_pc_i;
             
@@ -167,11 +192,9 @@ module decode_unit (
             rd_o          <= rd_use_rt_d ? rt_d : rd_d;
             imm_o         <= imm_d;
 
-            instr_class_o <= instr_class_d;
             alu_func_o    <= alu_func_d;
 
             alu_src_imm_o <= alu_src_imm_d;
-            active_mask_o <= if_active_mask_i;
             reg_write_o   <= reg_write_d;
             mem_read_o    <= mem_read_d;
             mem_write_o   <= mem_write_d;
