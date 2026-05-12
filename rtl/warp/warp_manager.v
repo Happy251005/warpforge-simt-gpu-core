@@ -40,6 +40,7 @@ module warp_manager (
     input  wire                         scoreboard_stall,
     input  wire [`WARP_ID_W-1:0]        scoreboard_stall_wid,
     input  wire                         scoreboard_stall_cause, // 0: register conflict, 1: branch
+    input  wire [`PC_WIDTH-1:0]         stall_pc, // from if_id registers
 
     // ============================
     // Scheduling Output
@@ -111,7 +112,7 @@ module warp_manager (
         else begin
 
             // --- Issue: increment PC ---
-            if (issue_valid && !(branch_commit && branch_wid == temp_id)) begin
+            if (issue_valid) begin
                 pc_array[temp_id] <= current_pc + 4;
                 if (temp_id == `NUM_WARPS-1)
                     rr_ptr <= 0;
@@ -123,6 +124,10 @@ module warp_manager (
             if (scoreboard_stall) begin
                 warp_state_array[scoreboard_stall_wid] <= `WARP_STALL;
                 stall_cause[scoreboard_stall_wid] <= scoreboard_stall_cause;
+                    if (scoreboard_stall_cause)  // branch stall
+                        pc_array[scoreboard_stall_wid] <= stall_pc + 4;
+                    else                         // register hazard stall
+                        pc_array[scoreboard_stall_wid] <= stall_pc;
             end
 
             // --- Scoreboard clear: unblock stalled warp ---

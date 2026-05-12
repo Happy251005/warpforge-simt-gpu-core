@@ -166,6 +166,7 @@ module compute_unit (
     .scoreboard_stall(sb_stall),
     .scoreboard_stall_wid(sb_stall_wid),
     .scoreboard_stall_cause(sb_stall_cause),
+    .stall_pc(if_id_pc),
 
     .current_wid(wm_wid),
     .issue_valid(wm_issue_valid),
