@@ -24,7 +24,7 @@ module instruction_fetch (
     input  wire [`INST_WIDTH-1:0]    imem_rdata,
 
     // To Decode Stage (IF/ID pipeline outputs)
-    output reg  [`INST_WIDTH-1:0]    if_instruction,
+    output wire [`INST_WIDTH-1:0]    if_instruction,
     output reg  [`WARP_ID_W-1:0]     if_wid,
     output reg                       if_valid,
     output reg  [`MASK_W-1:0]        if_active_mask,
@@ -32,18 +32,16 @@ module instruction_fetch (
 );
 
     assign imem_addr = current_pc;
-
+    assign if_instruction = imem_rdata;
     // Fetch logic
     always @(posedge clk) begin
         if(rst) begin
-            if_instruction <= 0;
             if_wid <= 0;
             if_valid <= 0;
             if_active_mask <= 0;
             if_pc <= 0;
         end
         else begin
-            if_instruction <= imem_rdata;
             if_wid <= current_wid;
             if_active_mask <= current_active_mask;
             if_pc <= current_pc;
