@@ -70,7 +70,7 @@ module vector_ALU (
 
             assign result_flat_o[(lane+1)*`LANE_WIDTH-1 -: `LANE_WIDTH] = result_lane;
 
-            // Bug fix: inactive lanes must not veto the branch — treat them as "agree" (1)
+            //inactive lanes must not veto the branch — treat them as "agree" (1)
             assign branch_lane_eq[lane] = (!active_mask_i[lane]) | (rs_lane == rt_lane);
 
         end

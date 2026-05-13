@@ -128,7 +128,7 @@ module decode_unit (
             `OPCODE_LOAD: begin
                 reg_write_d = 1;
                 mem_read_d  = 1;
-                rd_use_rt_d = 1;   // Bug fix: LOAD dest is rt [20:16], not rd [15:11]
+                rd_use_rt_d = 1;   //LOAD dest is rt field
             end
 
             `OPCODE_STORE: begin

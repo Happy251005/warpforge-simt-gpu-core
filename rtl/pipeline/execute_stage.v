@@ -52,7 +52,7 @@ module execute_stage (
     output reg                          reg_write_o,
     output reg                          mem_read_o,
     output reg                          mem_write_o,
-    output reg                          branch_o,     // new: branch flag pipelined through EX/MEM
+    output reg                          branch_o,     
     output reg                          branch_taken_o,
     output reg [`PC_WIDTH-1:0]          branch_target_o,
     output reg                          exit_o

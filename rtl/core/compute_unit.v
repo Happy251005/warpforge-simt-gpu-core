@@ -141,8 +141,6 @@ module compute_unit (
     wire [`WARP_ID_W-1:0]        exit_wid;
     // Branch resolve (not-taken unblock)
     wire                         branch_resolve;
-    wire [`WARP_ID_W-1:0]        branch_resolve_wid;
-    wire [`PC_WIDTH-1:0]         branch_fallthrough;
 
     // WB → Scoreboard
     wire                         clear_en;
@@ -164,7 +162,6 @@ module compute_unit (
     .branch_mask(branch_mask),
 
     .branch_resolve(branch_resolve),
-    .branch_resolve_wid(branch_resolve_wid),
 
     .clear_en(clear_en),
     .clear_wid(clear_wid),
@@ -423,8 +420,6 @@ module compute_unit (
     .exit_en_o(exit_en),
     .exit_wid_o(exit_wid),
 
-    .branch_resolve_o(branch_resolve),
-    .branch_resolve_wid_o(branch_resolve_wid),
-    .branch_fallthrough_o(branch_fallthrough)
+    .branch_resolve_o(branch_resolve)
     );
 endmodule

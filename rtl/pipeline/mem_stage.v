@@ -28,7 +28,7 @@ module mem_stage (
     input  wire                         reg_write_i,
     input  wire                         mem_read_i,
     input  wire                         mem_write_i,
-    input  wire                         branch_i,        // new: branch flag for MEM/WB
+    input  wire                         branch_i,       
     input  wire                         branch_taken_i,
     input  wire [`PC_WIDTH-1:0]         branch_target_i,
     input  wire                         exit_i,
@@ -51,7 +51,7 @@ module mem_stage (
     output reg  [`REG_ID_W-1:0]         rd_o,
 
     output reg                          reg_write_o,
-    output reg                          branch_o,        // new: branch flag propagated to WB
+    output reg                          branch_o,       
     output reg                          branch_taken_o,
     output reg [`PC_WIDTH-1:0]          branch_target_o,
     output reg                          exit_o

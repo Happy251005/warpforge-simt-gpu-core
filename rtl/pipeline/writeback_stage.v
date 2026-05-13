@@ -21,7 +21,7 @@ module writeback_stage (
     input  wire [`REG_ID_W-1:0]         rd_i,
 
     input  wire                         reg_write_i,
-    input  wire                         branch_i,        // branch flag (taken or not)
+    input  wire                         branch_i,       
     input  wire                         branch_taken_i,
     input  wire [`PC_WIDTH-1:0]         branch_target_i,
     input  wire                         exit_i,
@@ -51,9 +51,7 @@ module writeback_stage (
     output wire [`WARP_ID_W-1:0]        exit_wid_o,
 
     // Branch resolve interface (to warp manager) — fires on any valid branch (taken OR not-taken)
-    output wire                         branch_resolve_o,
-    output wire [`WARP_ID_W-1:0]        branch_resolve_wid_o,
-    output wire [`PC_WIDTH-1:0]         branch_fallthrough_o  // PC to resume on not-taken
+    output wire                         branch_resolve_o
 
 );
 
@@ -82,10 +80,7 @@ module writeback_stage (
     assign exit_wid_o       = wid_i;
 
     // Branch resolve — fires on ANY valid branch commit (taken or not-taken)
-    // Bug fix: branch-stalled warps must be unblocked even when branch is not taken
     assign branch_resolve_o         = valid_i & branch_i;
-    assign branch_resolve_wid_o     = wid_i;
-    assign branch_fallthrough_o     = branch_target_i;
 
 
 
