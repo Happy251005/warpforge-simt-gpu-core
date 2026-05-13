@@ -19,6 +19,11 @@ module warp_manager (
     input  wire [`PC_WIDTH-1:0]         branch_target,
     input  wire [`MASK_W-1:0]           branch_mask,
 
+    // Branch resolve interface — fires on any branch (taken OR not-taken)
+    // Needed to unblock branch-stalled warps when branch falls through
+    input  wire                         branch_resolve,
+    input  wire [`WARP_ID_W-1:0]        branch_resolve_wid,
+
     // ============================
     // Scoreboard Unblock Interface
     // (from writeback via scoreboard clear)
@@ -112,7 +117,8 @@ module warp_manager (
         else begin
 
             // --- Issue: increment PC ---
-            if (issue_valid) begin
+            // Bug fix: explicit priority — don't pre-increment if this warp is being stalled this cycle
+            if (issue_valid && !(scoreboard_stall && scoreboard_stall_wid == temp_id)) begin
                 pc_array[temp_id] <= current_pc + 4;
                 if (temp_id == `NUM_WARPS-1)
                     rr_ptr <= 0;
@@ -137,12 +143,21 @@ module warp_manager (
                 && !(scoreboard_stall && scoreboard_stall_wid == clear_wid))
                 warp_state_array[clear_wid] <= `WARP_READY;
 
-            // --- Branch commit: update PC and mask ---
+            // --- Branch commit: update PC and mask (taken branch) ---
             if (branch_commit) begin
                 pc_array[branch_wid]          <= branch_target;
                 active_mask_array[branch_wid] <= branch_mask;
-                warp_state_array[branch_wid] <= `WARP_READY;                
+                warp_state_array[branch_wid]  <= `WARP_READY;
             end
+
+            // --- Branch resolve: unblock on not-taken branch ---
+            // Bug fix: branch-stalled warp must be unblocked even when branch is not taken.
+            // branch_commit fires only when taken; branch_resolve fires for both.
+            // On not-taken: warp already has correct fall-through PC (stall_pc+4 saved at stall time).
+            if (branch_resolve && !branch_commit
+                && warp_state_array[branch_resolve_wid] == `WARP_STALL
+                && stall_cause[branch_resolve_wid] == 1)
+                warp_state_array[branch_resolve_wid] <= `WARP_READY;
 
             // --- Exit: mark warp DONE ---
             if (exit_en)

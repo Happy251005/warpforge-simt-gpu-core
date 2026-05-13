@@ -62,14 +62,17 @@ module vector_register_file (
     end
 
     // Combinational read
+    // Bug fix: REG_ZERO always reads as 0 (hardwired), regardless of array contents
     genvar lane;
     generate
         for (lane = 0; lane < `WARP_SIZE; lane = lane + 1) begin : READS
             assign rs_data_o[(lane+1)*`LANE_WIDTH-1 -: `LANE_WIDTH] =
-                regfile[read_wid_i][lane][rs_i];
+                (rs_i == `REG_ZERO) ? {`LANE_WIDTH{1'b0}}
+                                    : regfile[read_wid_i][lane][rs_i];
 
             assign rt_data_o[(lane+1)*`LANE_WIDTH-1 -: `LANE_WIDTH] =
-                regfile[read_wid_i][lane][rt_i];
+                (rt_i == `REG_ZERO) ? {`LANE_WIDTH{1'b0}}
+                                    : regfile[read_wid_i][lane][rt_i];
         end
     endgenerate
 

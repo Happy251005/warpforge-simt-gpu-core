@@ -52,6 +52,7 @@ module execute_stage (
     output reg                          reg_write_o,
     output reg                          mem_read_o,
     output reg                          mem_write_o,
+    output reg                          branch_o,     // new: branch flag pipelined through EX/MEM
     output reg                          branch_taken_o,
     output reg [`PC_WIDTH-1:0]          branch_target_o,
     output reg                          exit_o
@@ -119,6 +120,7 @@ module execute_stage (
             reg_write_o    <= 0;
             mem_read_o     <= 0;
             mem_write_o    <= 0;
+            branch_o       <= 0;
             branch_taken_o <= 0;
             exit_o         <= 0;
         end
@@ -133,6 +135,7 @@ module execute_stage (
             reg_write_o    <= reg_write_i;
             mem_read_o     <= mem_read_i;
             mem_write_o    <= mem_write_i;
+            branch_o       <= branch_i;
             branch_taken_o <= branch_taken_w;
             branch_target_o <= branch_target_w;
             exit_o         <= exit_i;

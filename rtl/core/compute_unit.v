@@ -109,6 +109,7 @@ module compute_unit (
     wire                     ex_mem_reg_write;
     wire                     ex_mem_mem_read;
     wire                     ex_mem_mem_write;
+    wire                     ex_mem_branch;    // new: branch flag pipelined to EX/MEM
     wire                     ex_mem_exit;
 
     // MEM/WB
@@ -119,6 +120,7 @@ module compute_unit (
     wire [`WARP_SIZE*`LANE_WIDTH-1:0] mem_wb_result;
     wire [`REG_ID_W-1:0]     mem_wb_rd;
     wire                     mem_wb_reg_write;
+    wire                     mem_wb_branch;        // new: branch flag in MEM/WB
     wire                     mem_wb_branch_taken;
     wire [`PC_WIDTH-1:0]     mem_wb_branch_target;
     wire                     mem_wb_exit;
@@ -137,6 +139,10 @@ module compute_unit (
     wire [`MASK_W-1:0]           branch_mask;
     wire                         exit_en;
     wire [`WARP_ID_W-1:0]        exit_wid;
+    // Branch resolve (not-taken unblock)
+    wire                         branch_resolve;
+    wire [`WARP_ID_W-1:0]        branch_resolve_wid;
+    wire [`PC_WIDTH-1:0]         branch_fallthrough;
 
     // WB → Scoreboard
     wire                         clear_en;
@@ -156,6 +162,9 @@ module compute_unit (
     .branch_wid(branch_wid),
     .branch_target(branch_target),
     .branch_mask(branch_mask),
+
+    .branch_resolve(branch_resolve),
+    .branch_resolve_wid(branch_resolve_wid),
 
     .clear_en(clear_en),
     .clear_wid(clear_wid),
@@ -328,6 +337,7 @@ module compute_unit (
     .reg_write_o(ex_mem_reg_write),
     .mem_read_o(ex_mem_mem_read),
     .mem_write_o(ex_mem_mem_write),
+    .branch_o(ex_mem_branch),
     .branch_taken_o(ex_mem_branch_taken),
     .branch_target_o(ex_mem_branch_target),
     .exit_o(ex_mem_exit)
@@ -352,6 +362,7 @@ module compute_unit (
     .reg_write_i(ex_mem_reg_write),
     .mem_read_i(ex_mem_mem_read),
     .mem_write_i(ex_mem_mem_write),
+    .branch_i(ex_mem_branch),
     .branch_taken_i(ex_mem_branch_taken),
     .branch_target_i(ex_mem_branch_target),
     .exit_i(ex_mem_exit),
@@ -374,6 +385,7 @@ module compute_unit (
     .rd_o(mem_wb_rd),
 
     .reg_write_o(mem_wb_reg_write),
+    .branch_o(mem_wb_branch),
     .branch_taken_o(mem_wb_branch_taken),
     .branch_target_o(mem_wb_branch_target),
     .exit_o(mem_wb_exit)
@@ -388,6 +400,7 @@ module compute_unit (
     .result_i(mem_wb_result),
     .rd_i(mem_wb_rd),
     .reg_write_i(mem_wb_reg_write),
+    .branch_i(mem_wb_branch),
     .branch_taken_i(mem_wb_branch_taken),
     .branch_target_i(mem_wb_branch_target),
     .exit_i(mem_wb_exit),
@@ -408,6 +421,10 @@ module compute_unit (
     .clear_rd_o(clear_rd),
 
     .exit_en_o(exit_en),
-    .exit_wid_o(exit_wid)
+    .exit_wid_o(exit_wid),
+
+    .branch_resolve_o(branch_resolve),
+    .branch_resolve_wid_o(branch_resolve_wid),
+    .branch_fallthrough_o(branch_fallthrough)
     );
 endmodule

@@ -128,6 +128,7 @@ module decode_unit (
             `OPCODE_LOAD: begin
                 reg_write_d = 1;
                 mem_read_d  = 1;
+                rd_use_rt_d = 1;   // Bug fix: LOAD dest is rt [20:16], not rd [15:11]
             end
 
             `OPCODE_STORE: begin
@@ -182,7 +183,7 @@ module decode_unit (
         else begin
             // SIMT identity propagation
             wid_o         <= if_wid_i;
-            valid_o       <= if_valid_i & !(stall_i & !branch_instr); // Kill valid bit if stalled (bubble)
+            valid_o       <= if_valid_i & !(stall_i & !branch_instr); // Branch stalls: let branch flow through to commit; RAW stalls: bubble
             active_mask_o <= if_active_mask_i;
             pc_o          <= if_pc_i;
             
