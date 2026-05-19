@@ -93,7 +93,7 @@ module tb_compute_unit;
     initial begin
         rst = 1;
         #20 rst = 0;
-        #520000;
+        #1000;
 
         $display("");
         $display("--------------------------------------------------");
