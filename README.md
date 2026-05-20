@@ -6,9 +6,11 @@
 ![Toolchain](https://img.shields.io/badge/Verified-Vivado-green)
 ![Status](https://img.shields.io/badge/Project-Educational-orange)
 
-WarpForge is a simplified **SIMT (Single Instruction, Multiple Thread) GPU compute core** written in synthesizable Verilog RTL. It implements the fundamental execution mechanisms used inside modern GPUs—warp scheduling, vector execution across SIMD lanes, interleaved multithreaded latency hiding, and a custom instruction set—while keeping the design small enough to study directly at RTL level.
+WarpForge is a simplified **SIMT (Single Instruction, Multiple Thread) GPU compute core** written in synthesizable Verilog RTL. It implements the fundamental execution mechanisms used inside modern GPUs—warp scheduling, vector execution across SIMD lanes, interleaved multithreaded latency hiding, register dependency tracking via scoreboard, and a custom instruction set—while keeping the design small enough to study directly at RTL level.
 
 The project is designed as an **educational compute unit**, not a full GPU. It represents one simplified GPU execution block: conceptually similar to a single Streaming Multiprocessor (SM) or Compute Unit (CU), stripped down to the essential architectural mechanisms that make GPU execution distinct from scalar CPU pipelines.
+
+**Current Implementation Status:** Core pipeline operational with scoreboard-based RAW hazard detection. All 4 warps × 4 lanes execute correctly with proper instruction dependency tracking and interleaved scheduling.
 
 WarpForge is intended for:
 
@@ -17,6 +19,7 @@ WarpForge is intended for:
 * GPU microarchitecture exploration
 * FPGA-oriented architectural study
 * academic demonstration of SIMT execution
+* hands-on study of hazard detection and scoreboard design
 
 ---
 
@@ -33,6 +36,7 @@ WarpForge is intended for:
 - [ISA](#isa)
 - [Branch Model](#branch-model)
 - [Memory Model](#memory-model)
+- [Scoreboard & Hazard Detection](#scoreboard--hazard-detection)
 - [Key Design Decisions](#key-design-decisions)
 - [RTL File Structure](#rtl-file-structure)
 - [Verified Programs](#verified-programs)
@@ -59,7 +63,7 @@ Modern GPUs execute thousands of threads by grouping them into lockstep executio
 
 Each warp maintains its own program counter and register context, while a scheduler interleaves warp issue to hide instruction latency.
 
-The design deliberately avoids industrial complexity such as scoreboards, caches, and divergence stacks so that the execution model remains transparent.
+The design includes **per-warp scoreboard** for register dependency tracking and deliberately avoids unnecessary complexity such as caches and divergence stacks, maintaining transparency in the execution model while supporting realistic hazard detection.
 
 ---
 
@@ -88,6 +92,7 @@ warpforge-simt-gpu-core/
 │   ├── register_file/
 │   │   └── vector_register_file.v
 │   └── warp/
+│       ├── scoreboard.v        ← Per-warp register dependency tracking
 │       └── warp_manager.v
 ├── sim/
 │   ├── programs/
@@ -100,6 +105,7 @@ warpforge-simt-gpu-core/
 │   └── unit/
 │       └── tb_compute_unit.v
 ├── .gitignore
+├── DIVERGENCE_PLAN.md          ← Future divergence implementation roadmap
 └── README.md
 ```
 
@@ -353,34 +359,86 @@ This keeps simulation easy to inspect.
 
 ---
 
+# Scoreboard & Hazard Detection
+
+WarpForge implements a **per-warp scoreboard** for real-time register dependency tracking.
+
+## Scoreboard Architecture
+
+Each warp maintains a busy table tracking in-flight destination registers:
+
+* Set: when instruction with `reg_write` is issued from decode
+* Clear: when instruction commits to writeback
+* Query: combinational stall check during decode
+
+## RAW Hazard Prevention
+
+```text
+Instruction N: ADD r2, r3, r4        ← Sets r2 busy
+Instruction N+1: SUB r5, r2, r6      ← Queries r2 dependency
+                                       → STALL if r2 still busy
+```
+
+## Stall Behavior
+
+When a source register is marked busy:
+
+1. Instruction cannot leave decode
+2. Issuing warp transits to STALL state
+3. Warp skips scheduler until register clears
+4. Writeback clears register, warp returns to READY
+
+## Design Benefits
+
+* **No forwarding network** — Simpler than data forwarding paths
+* **Transparent timing** — Stalls are visible and predictable
+* **Correct by construction** — Single in-flight instruction per warp guarantees safety
+* **Educational clarity** — Scoreboard logic is small enough to inspect at RTL level
+
+---
+
 # Key Design Decisions
 
 ---
 
-# 1. Issue-Stall Instead of Scoreboard
+# 1. Scoreboard-Based Dependency Tracking
 
-Industrial GPUs use scoreboards to track register dependencies.
+WarpForge implements a per-warp scoreboard to detect RAW hazards while maintaining clarity of execution flow.
 
-WarpForge deliberately does not.
+## Why Not Just Interleave?
 
-Instead:
+Early design avoided scoreboards by strict issue-stall discipline:
+* Issue warp → immediately stall it
+* Only one instruction per warp in flight
+* No dependency checking needed
 
-* issue warp
-* stall warp
-* commit warp
-* release warp
+**Decision Update (v1.1):** Added scoreboard to support:
+* Realistic hazard detection
+* Educational study of dependency tracking
+* Foundation for future divergence support
+* Measurable stall behavior
 
-Because only one instruction per warp is in flight:
+## How It Works
 
-* no RAW hazards
-* no forwarding required
-* no dependency tracking required
+```text
+Scoreboard tracks which registers are "busy"
+(i.e., destination of in-flight instruction)
 
-The scheduler itself enforces correctness.
+On decode:
+1. Check if source registers are busy → STALL if true
+2. Check if destination register is ALU_ZERO → never mark busy
+3. Query is combinational (cycle-accurate results)
+
+On writeback:
+1. Destination register cleared from busy table
+2. Warp returns to READY state
+```
+
+This keeps the design educational—every stall is visible, traceable, and deterministic.
 
 ---
 
-# 2. No Branch Flush Required
+# 2. Single In-Flight Instruction Eliminates Wrong-Path Execution
 
 Branch target is resolved in EX but committed in WB.
 
@@ -403,9 +461,9 @@ That removes one of the nastiest pieces of beginner pipeline design.
 
 ---
 
-# 3. Combinational Writeback and Commit
+# 3. Combinational Writeback, Commit, and Scoreboard Clear
 
-Warp commit occurs in same cycle as VRF write.
+Warp commit and register cleanup occur in same cycle as VRF write.
 
 ## Current Behavior
 
@@ -423,6 +481,8 @@ Earlier registered commit caused:
 * visible throughput loss
 
 Removing that extra register fixed scheduler rhythm completely.
+
+Additionally, clearing the scoreboard entry combinationally allows the next warp issue in the same cycle—critical for maintaining round-robin interleaving efficiency.
 
 ---
 
@@ -444,25 +504,40 @@ mem[tid] = value
 
 ---
 
+# 5. Uniform Branching (Current Design Point)
+
+All SIMD lanes must agree on branch outcome.
+
+```text
+taken = AND(all lane comparisons)
+```
+
+**Limitation:** Lanes that disagree still execute both paths sequentially, wasting cycles.
+
+**Planned Enhancement:** Divergence stack (see DIVERGENCE_PLAN.md) will enable per-lane masking and selective execution, allowing individual lanes to take different paths while tracking reconvergence points.
+
+---
+
 # RTL File Structure
 
-| File                   | Description                    |
-| ---------------------- | ------------------------------ |
-| cu_defs.vh             | Parameters and ISA definitions |
-| top.v                  | Top wrapper                    |
-| compute_unit.v         | Pipeline integration           |
-| warp_manager.v         | Warp scheduler                 |
-| IFU.v                  | Instruction fetch              |
-| decode_unit.v          | Decode stage                   |
-| execute_stage.v        | SIMD ALU and branch logic      |
-| mem_stage.v            | Memory stage                   |
-| writeback_stage.v      | Writeback and commit           |
-| vector_register_file.v | Register storage               |
-| vector_ALU.v           | Lane arithmetic                |
-| instruction_memory.v   | Program ROM                    |
-| data_memory.v          | Shared RAM                     |
-| program.mem            | Test program                   |
-| tb_compute_unit.v      | Testbench                      |
+| File                   | Description                             |
+| ---------------------- | --------------------------------------- |
+| cu_defs.vh             | Parameters and ISA definitions          |
+| top.v                  | Top wrapper                             |
+| compute_unit.v         | Pipeline integration                    |
+| warp_manager.v         | Warp scheduler & state machine          |
+| scoreboard.v           | Per-warp register busy tracking         |
+| IFU.v                  | Instruction fetch                       |
+| decode_unit.v          | Decode stage & scoreboard query         |
+| execute_stage.v        | SIMD ALU and branch resolution          |
+| mem_stage.v            | Memory stage                            |
+| writeback_stage.v      | Writeback, commit & scoreboard clear    |
+| vector_register_file.v | Register storage (4 warps × 32 regs)    |
+| vector_ALU.v           | Lane arithmetic (ADD, SUB, AND, OR)     |
+| instruction_memory.v   | Program ROM                             |
+| data_memory.v          | Shared RAM (16 words)                   |
+| program.mem            | Test program                            |
+| tb_compute_unit.v      | Testbench                               |
 
 ---
 
@@ -699,18 +774,29 @@ WarpForge teaches:
 
 ---
 
-# Future Work
+# Implementation Roadmap
+
+## Completed
+- ✅ Core 5-stage pipeline (IF/ID/EX/MEM/WB)
+- ✅ Per-warp scoreboard for RAW hazard detection
+- ✅ Round-robin warp scheduling
+- ✅ Vector register file (4 warps, 32 regs each, 32-bit lanes)
+- ✅ SIMD ALU (4 lanes wide)
+- ✅ Uniform branch execution
+- ✅ Word-addressed shared memory
+
+## Future Enhancements (Educational Value)
 
 Possible next architectural steps:
 
-* scoreboard-based dependency tracking
-* divergence stack
-* predication support
-* scalar unit
-* instruction cache
-* data cache
-* wider warp sizes
+* branch Divergence Support
+* predication support (alternative to divergence)
+* scalar co-processor unit
+* instruction cache with prefetch
+* data cache with coherency
+* wider warp sizes (8 or 16 lanes)
 * multi-compute-unit scaling
+* vectorized memory operations (gather/scatter)
 
 That is where the little teaching machine begins to mutate toward something suspiciously industrial.
 
