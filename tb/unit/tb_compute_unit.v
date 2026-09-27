@@ -29,8 +29,8 @@ module tb_compute_unit;
     // EXIT Monitor — warp completion
     always @(posedge clk) begin
         if (u_top.u_compute_unit.exit_en) begin
-            $display("[EXIT]   T=%0t | Warp %0d | --> DONE",
-                $time/1000,
+            $display("[EXIT]   T=%0d | Warp %0d | --> DONE",
+                $time,
                 u_top.u_compute_unit.exit_wid);
         end
     end
@@ -41,8 +41,8 @@ module tb_compute_unit;
         if (u_top.u_compute_unit.dmem_write_en_o) begin
             for (i = 0; i < `WARP_SIZE; i = i + 1) begin
                 if (u_top.u_compute_unit.dmem_write_mask_o[i])
-                    $display("[STORE]  T=%0t | Warp %0d | lane%0d | addr=%04h | data=%0d",
-                        $time/1000,
+                    $display("[STORE]  T=%0d | Warp %0d | lane%0d | addr=%04h | data=%0d",
+                        $time,
                         u_top.u_compute_unit.ex_mem_wid,
                         i,
                         u_top.u_compute_unit.dmem_addr_flat_o[(i+1)*`LANE_WIDTH-1 -: `LANE_WIDTH],
@@ -54,8 +54,8 @@ module tb_compute_unit;
     // BRANCH Monitor — taken branches
     always @(posedge clk) begin
         if (u_top.u_compute_unit.ex_mem_branch_taken && u_top.u_compute_unit.ex_mem_valid) begin
-            $display("[BRANCH] T=%0t | Warp %0d | TAKEN → target=%04h",
-                $time/1000,
+            $display("[BRANCH] T=%0d | Warp %0d | TAKEN → target=%04h",
+                $time,
                 u_top.u_compute_unit.ex_mem_wid,
                 u_top.u_compute_unit.ex_mem_branch_target);
         end
@@ -64,8 +64,8 @@ module tb_compute_unit;
     // Scoreboard CLEAR Monitor — register writebacks completing
     always @(posedge clk) begin
         if (u_top.u_compute_unit.clear_en) begin
-            $display("[CLEAR]  T=%0t | Warp %0d | R%0d cleared",
-                $time/1000,
+            $display("[CLEAR]  T=%0d | Warp %0d | R%0d cleared",
+                $time,
                 u_top.u_compute_unit.clear_wid,
                 u_top.u_compute_unit.clear_rd);
         end
@@ -78,8 +78,8 @@ module tb_compute_unit;
     always @(posedge clk) begin
         cycle_count = cycle_count + 1;
         if (cycle_count % 10 == 0) begin
-            $display("[IF/ID]  T=%0t | Warp %0d | PC=%04h | valid=%0d | instr=%08h",
-                $time/1000,
+            $display("[IF/ID]  T=%0d | Warp %0d | PC=%04h | valid=%0d | instr=%08h",
+                $time,
                 u_top.u_compute_unit.if_id_wid,
                 u_top.u_compute_unit.if_id_pc,
                 u_top.u_compute_unit.if_id_valid,
