@@ -110,6 +110,7 @@
 // ------------------------------------------------------------
 
 `define OPCODE_EXIT    6'b011000
+`define OPCODE_SETRPC  6'b011001  // set pending reconvergence PC (staging register)
 
 
 // ------------------------------------------------------------
@@ -130,6 +131,13 @@
 // ------------------------------------------------------------
 
 `define FULL_MASK   {`MASK_W{1'b1}}
+
+// ------------------------------------------------------------
+// 13. SIMT STACK CONSTANTS
+// ------------------------------------------------------------
+
+`define STACK_DEPTH  8            // entries per warp (supports 4 nesting levels, 2 entries each)
+`define STACK_PTR_W  4            // ceil(log2(STACK_DEPTH+1)) = 4 bits holds 0..8
 `define ZERO_MASK   {`MASK_W{1'b0}}
 
 

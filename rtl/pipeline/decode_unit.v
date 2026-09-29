@@ -22,6 +22,7 @@ module decode_unit (
 
     // From Scoreboard
     input  wire                         stall_i,
+    input  wire                         stall_cause_i,
 
     // To Scoreboard
     output wire                         set_en,
@@ -33,6 +34,11 @@ module decode_unit (
     output wire [`REG_ID_W-1:0]         check_rs,
     output wire [`REG_ID_W-1:0]         check_rt,
     output wire                         check_alu_src_imm,
+
+    // SETRPC interface (to simt_stack staging register)
+    output wire                         setrpc_en,
+    output wire [`WARP_ID_W-1:0]        setrpc_wid,
+    output wire [`PC_WIDTH-1:0]         setrpc_val,
 
     // ===============================
     // ID/EX Pipeline Outputs
@@ -95,6 +101,11 @@ module decode_unit (
     assign check_rt        = rt_d;
     assign check_alu_src_imm = alu_src_imm_d;
 
+    // SETRPC: fire combinationally when SETRPC is in IF/ID (no stall needed)
+    assign setrpc_en  = if_valid_i & (opcode == `OPCODE_SETRPC);
+    assign setrpc_wid = if_wid_i;
+    assign setrpc_val = imm_d;
+
     // Branch detection
     assign branch_instr    = if_valid_i & branch_d;
 
@@ -145,6 +156,11 @@ module decode_unit (
                 branch_inv_d = 1;   // taken when rs != rt
             end
 
+            `OPCODE_SETRPC: begin
+                // SETRPC: writes pending_rpc staging register in simt_stack.
+                // No VRF write, no branch stall, transparent in the pipeline.
+            end
+
             `OPCODE_EXIT: begin
                 exit_d = 1;
             end
@@ -183,7 +199,7 @@ module decode_unit (
         else begin
             // SIMT identity propagation
             wid_o         <= if_wid_i;
-            valid_o       <= if_valid_i & !(stall_i & !branch_instr); // Branch stalls: let branch flow through to commit; RAW stalls: bubble
+            valid_o       <= if_valid_i & !(stall_i & !stall_cause_i); // Branch stalls: let branch flow through to commit; RAW stalls: bubble
             active_mask_o <= if_active_mask_i;
             pc_o          <= if_pc_i;
             
